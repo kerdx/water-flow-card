@@ -53,6 +53,7 @@ const STRINGS = {
     windows: 'Windows',
     windowsAria: 'Watering windows',
     frequency: 'Frequency',
+    battery: (value) => `Battery ${value}`,
     frequencyHelp: 'The schedule checks your selected weekdays on a repeating N-day cycle.',
     anchorHelp: 'The cycle starts on this date; required when frequency exceeds one day.',
     nextWindow: 'Next: ',
@@ -146,10 +147,10 @@ const STRINGS = {
     fields: {
       entity: 'Pump switch', name: 'Name', icon: 'Icon', layout: 'Layout',
       accent_color: 'Accent colour', surface: 'Card surface', language: 'Language',
-      auto_entity: 'Auto helper', flow_entity: 'Flow sensor', volume_entity: 'Volume sensor',
+      auto_entity: 'Auto helper', flow_entity: 'Flow sensor', volume_entity: 'Volume sensor', battery_entity: 'Battery sensor',
       program_entity: 'Programs sensor',
       show_state_chip: 'Show pump state', show_flow_chip: 'Show flow',
-      show_volume_chip: 'Show volume', show_next_change_chip: 'Show next window',
+      show_volume_chip: 'Show volume', show_battery_button: 'Show battery button', show_next_change_chip: 'Show next window',
       show_unavailable_badge: 'Show unavailable badge', show_auto_button: 'Show auto button',
       show_schedule_button: 'Show schedule buttons',
       tap_action: 'Tap action', hold_action: 'Hold action', double_tap_action: 'Double tap action',
@@ -166,12 +167,14 @@ const STRINGS = {
       surface: 'Card background: default follows the theme, elevated adds contrast and depth, blend drops the background for dark dashboards.',
       language: 'Card language; auto follows the Home Assistant interface language.',
       auto_entity: 'input_boolean that hands the pump to the scheduler while it is on.',
-      flow_entity: 'Sensor reporting the current flow, shown as a chip.',
-      volume_entity: 'Sensor reporting the water volume, shown as a chip.',
+      flow_entity: 'Flow sensor override; if empty, a matching sensor is detected automatically.',
+      volume_entity: 'Volume sensor override; if empty, a matching sensor is detected automatically.',
+      battery_entity: 'Battery sensor override; if empty, a matching sensor is detected automatically.',
       program_entity: 'Diagnostic sensor created by the integration. Leave empty to find it automatically.',
       show_state_chip: 'Watering or off state in the status line.',
       show_flow_chip: 'Current flow chip.',
       show_volume_chip: 'Volume chip.',
+      show_battery_button: 'Battery sensor button; opens more-info for the selected sensor.',
       show_next_change_chip: 'Next watering window in the status line.',
       show_unavailable_badge: 'Indicator when the entity is unavailable.',
       show_auto_button: 'Show the Auto sub-button that toggles the auto helper.',
@@ -207,6 +210,7 @@ const STRINGS = {
     windows: 'Orari',
     windowsAria: 'Finestre di irrigazione',
     frequency: 'Frequenza',
+    battery: (value) => `Batteria ${value}`,
     frequencyHelp: 'Il programma verifica i giorni selezionati seguendo un ciclo di N giorni.',
     anchorHelp: 'Il ciclo inizia da questa data; richiesta quando la frequenza supera un giorno.',
     nextWindow: 'Prossimo: ',
@@ -298,9 +302,10 @@ const STRINGS = {
       entity: 'Switch pompa', name: 'Nome', icon: 'Icona', layout: 'Layout',
       accent_color: 'Colore accento', surface: 'Sfondo card', language: 'Lingua',
       auto_entity: 'Entità Auto', flow_entity: 'Sensore di portata', volume_entity: 'Sensore di volume',
+      battery_entity: 'Sensore batteria',
       program_entity: 'Sensore programmi',
       show_state_chip: 'Mostra stato pompa', show_flow_chip: 'Mostra portata',
-      show_volume_chip: 'Mostra volume', show_next_change_chip: 'Mostra prossimo orario',
+      show_volume_chip: 'Mostra volume', show_battery_button: 'Mostra pulsante batteria', show_next_change_chip: 'Mostra prossimo orario',
       show_unavailable_badge: 'Mostra badge non disponibile', show_auto_button: 'Mostra pulsante Auto',
       show_schedule_button: 'Mostra pulsanti pianificazione',
       tap_action: 'Azione al tocco', hold_action: 'Azione alla pressione lunga', double_tap_action: 'Azione al doppio tocco',
@@ -317,12 +322,14 @@ const STRINGS = {
       surface: 'Sfondo della card: default segue il tema, elevated aggiunge contrasto, blend elimina lo sfondo per dashboard scure.',
       language: 'Lingua della card; auto segue la lingua dell’interfaccia Home Assistant.',
       auto_entity: 'input_boolean che affida la pompa al pianificatore quando è attiva.',
-      flow_entity: 'Sensore con la portata corrente, mostrato come chip.',
-      volume_entity: 'Sensore con il volume d’acqua, mostrato come chip.',
+      flow_entity: 'Sensore di portata da preferire; se vuoto, viene rilevato automaticamente.',
+      volume_entity: 'Sensore del volume da preferire; se vuoto, viene rilevato automaticamente.',
+      battery_entity: 'Sensore batteria da preferire; se vuoto, viene rilevato automaticamente.',
       program_entity: 'Sensore diagnostico creato dall’integrazione. Lascia vuoto per trovarlo automaticamente.',
       show_state_chip: 'Stato in irrigazione o spenta nella riga di stato.',
       show_flow_chip: 'Chip della portata attuale.',
       show_volume_chip: 'Chip del volume.',
+      show_battery_button: 'Pulsante batteria; apre i dettagli del sensore selezionato.',
       show_next_change_chip: 'Prossima finestra di irrigazione nella riga di stato.',
       show_unavailable_badge: 'Indicatore quando l’entità non è disponibile.',
       show_auto_button: 'Mostra il sotto-pulsante Auto che commuta l’entità Auto.',
@@ -409,6 +416,54 @@ export const chipValue = (state, locale) => {
   if (number === null) return null;
   const unit = entityUnit(state);
   return unit ? `${number} ${unit}` : number;
+};
+
+const entityTokens = (entityId, state, extraName = '') => new Set(
+  `${entityId?.split('.')?.[1] || ''} ${state?.attributes?.friendly_name || ''} ${extraName || ''}`
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length > 1),
+);
+
+const isSensorKind = (entityId, state, kind) => {
+  const attributes = state?.attributes || {};
+  const deviceClass = String(attributes.device_class || '').toLowerCase();
+  const unit = entityUnit(state).toLowerCase().replaceAll('³', '3').replaceAll('²', '2').replaceAll(' ', '');
+  const name = `${entityId || ''} ${attributes.friendly_name || ''} ${attributes.icon || ''}`.toLowerCase();
+  if (kind === 'battery') {
+    return deviceClass === 'battery' || (unit === '%' && /battery|batteria|charge/.test(name));
+  }
+  if (kind === 'flow') {
+    return deviceClass === 'volume_flow_rate' || deviceClass === 'flow'
+      || ((unit.includes('/') || unit.includes('per')) && /(?:l|m3|gal|ft3)/.test(unit));
+  }
+  if (kind === 'volume') {
+    if (deviceClass === 'volume_flow_rate' || deviceClass === 'flow') return false;
+    return ['volume', 'water', 'volume_storage'].includes(deviceClass)
+      || ['l', 'ml', 'm3', 'gal', 'ft3', 'liter', 'liters', 'litre', 'litres'].includes(unit);
+  }
+  return false;
+};
+
+// Auto-discover only sensor entities that look like the requested measurement.
+// A unique candidate is safe to use; otherwise prefer a uniquely named match
+// to the pump, and leave ambiguous choices unset for the user to configure.
+export const discoverSensorEntity = (hass, pumpEntity, kind, pumpName = '') => {
+  const states = hass?.states;
+  if (!states || !['flow', 'volume', 'battery'].includes(kind)) return null;
+  const candidates = Object.entries(states)
+    .filter(([entityId, state]) => entityId.startsWith('sensor.') && isSensorKind(entityId, state, kind))
+    .map(([entityId, state]) => ({ entityId, state }));
+  if (candidates.length === 1) return candidates[0].entityId;
+  if (candidates.length < 2) return null;
+  const pumpTokens = entityTokens(pumpEntity, states[pumpEntity], pumpName);
+  const scored = candidates.map(({ entityId, state }) => {
+    const tokens = entityTokens(entityId, state);
+    let score = 0;
+    for (const token of tokens) if (pumpTokens.has(token)) score += 1;
+    return { entityId, score };
+  }).sort((a, b) => b.score - a.score);
+  return scored[0].score > 0 && scored[0].score > scored[1].score ? scored[0].entityId : null;
 };
 
 export const formatDuration = (minutes, strings) => {
@@ -709,6 +764,7 @@ const defaultCardConfig = (entity = 'switch.irrigazione') => ({
   show_state_chip: true,
   show_flow_chip: true,
   show_volume_chip: true,
+  show_battery_button: true,
   show_next_change_chip: true,
   show_unavailable_badge: true,
   show_auto_button: true,
@@ -774,10 +830,11 @@ export const configSchema = [
     field('auto_entity', { entity: { filter: { domain: ['input_boolean'] } } }),
     field('flow_entity', { entity: { filter: { domain: ['sensor'] } } }),
     field('volume_entity', { entity: { filter: { domain: ['sensor'] } } }),
+    field('battery_entity', { entity: { filter: { domain: ['sensor'] } } }),
     field('program_entity', { entity: { filter: { domain: ['sensor'] } } }),
   ]),
   grid('visible', [
-    ...['show_state_chip', 'show_flow_chip', 'show_volume_chip', 'show_next_change_chip', 'show_unavailable_badge', 'show_auto_button', 'show_schedule_button']
+    ...['show_state_chip', 'show_flow_chip', 'show_volume_chip', 'show_battery_button', 'show_next_change_chip', 'show_unavailable_badge', 'show_auto_button', 'show_schedule_button']
       .map((name) => field(name, { boolean: {} })),
   ]),
   expandable('controls', [
@@ -832,13 +889,18 @@ const CARD_CSS = `
   .side{flex:0 0 auto;display:flex;align-items:center;gap:8px}
   .round{width:38px;height:38px;border-radius:50%;border:1px solid var(--divider-color);background:var(--secondary-background-color);color:var(--primary-text-color);display:flex;align-items:center;justify-content:center;cursor:pointer}
   .round:hover{border-color:var(--water-flow-accent-color);color:var(--water-flow-accent-color)}
+  .battery-button{height:38px;max-width:116px;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:0 10px;border:1px solid var(--divider-color);border-radius:999px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;font-size:12px;font-weight:650;white-space:nowrap;cursor:pointer;transition:background-color .18s,border-color .18s,color .18s}
+  .battery-button ha-icon{--mdc-icon-size:17px;flex:0 0 auto}
+  .battery-button .battery-value{overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+  .battery-button:hover{background:color-mix(in srgb,var(--water-flow-accent-color) 9%,var(--secondary-background-color));border-color:color-mix(in srgb,var(--water-flow-accent-color) 45%,var(--divider-color));color:var(--water-flow-accent-color)}
+  .battery-button:focus-visible,.round:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
   .subrow{display:flex;gap:8px;padding:0 14px 14px}
   .compact .subrow{padding:0 12px 12px}
   .sub{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 8px;border-radius:12px;border:1px solid var(--divider-color);background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .sub ha-icon{--mdc-icon-size:16px;flex:0 0 auto}
   .sub .sub-label{overflow:hidden;text-overflow:ellipsis}
   .sub[data-active="true"]{background:color-mix(in srgb, var(--water-flow-accent-color) 22%, transparent);border-color:color-mix(in srgb, var(--water-flow-accent-color) 55%, transparent);color:var(--water-flow-accent-color)}
-  .sub:focus-visible,.round:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
+  .sub:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
   .error{margin:0 14px 12px;padding:8px 10px;border-radius:10px;background:color-mix(in srgb, var(--error-color) 15%, transparent);color:var(--error-color);font-size:12px;line-height:1.35}
   .unavailable{opacity:.6}
   @keyframes wf-pulse{0%{transform:scale(1)}45%{transform:scale(1.12)}100%{transform:scale(1)}}
@@ -1052,6 +1114,12 @@ export class WaterFlowCard extends HTMLElementBase {
 
   _program() { return programOf(this._hass, this.config); }
 
+  _sensorEntity(configField, kind) {
+    const configured = this.config?.[configField];
+    if (typeof configured === 'string' && configured) return configured;
+    return discoverSensorEntity(this._hass, this.config?.entity, kind, this.config?.name);
+  }
+
   _service(domain, service, data) {
     if (!this._hass?.callService) {
       this._showServiceError(new Error(this._strings().backendMissing));
@@ -1090,12 +1158,18 @@ export class WaterFlowCard extends HTMLElementBase {
     const state = this._entity();
     const program = this._program();
     const auto = this._autoState();
+    const readoutStates = [['flow_entity', 'flow'], ['volume_entity', 'volume'], ['battery_entity', 'battery']].map(([field, kind]) => {
+      const entityId = this._sensorEntity(field, kind);
+      const sensor = this._hass?.states?.[entityId];
+      return [entityId, sensor?.state, sensor?.attributes?.unit_of_measurement];
+    });
     return JSON.stringify([
       this.config,
       state?.state,
       state?.attributes?.friendly_name,
       this._hass?.locale?.language ?? this._hass?.language ?? null,
       auto?.state,
+      readoutStates,
       program,
       this._sessionMinute,
       this._dialogError,
@@ -1139,6 +1213,10 @@ export class WaterFlowCard extends HTMLElementBase {
     const program = this._program();
     const auto = this._autoState();
     const autoEntity = this._autoEntity();
+    const flowEntity = this._sensorEntity('flow_entity', 'flow');
+    const volumeEntity = this._sensorEntity('volume_entity', 'volume');
+    const batteryEntity = this._sensorEntity('battery_entity', 'battery');
+    const batteryState = batteryEntity ? this._hass?.states?.[batteryEntity] : null;
     const status = state?.state;
     const unavailable = status === 'unavailable' || status === 'unknown';
     const statusView = activeProgram(program, Date.now());
@@ -1149,6 +1227,8 @@ export class WaterFlowCard extends HTMLElementBase {
     const locale = cardLanguage(config, this._hass) === 'it' ? 'it-IT' : 'en-US';
     const chips = [];
     const stateLabel = unavailable ? strings.unavailable : pumpStateLabel(status, strings);
+    const batteryValue = chipValue(batteryState, locale) ?? strings.unavailable;
+    const batteryLabel = strings.battery(batteryValue);
     if (config.show_state_chip !== false) {
       chips.push(`<span class="state-chip${running ? ' live' : ''}" data-state="${esc(status || 'unavailable')}">${esc(stateLabel)}</span>`);
     }
@@ -1161,12 +1241,12 @@ export class WaterFlowCard extends HTMLElementBase {
       const minutes = sessionMinutes(Date.now(), this._sessionStartMs);
       if (minutes) chips.push(`<span class="live">${esc(strings.session(minutes))}</span>`);
     }
-    if (config.show_flow_chip !== false && config.flow_entity) {
-      const value = chipValue(this._hass?.states?.[config.flow_entity], locale);
+    if (config.show_flow_chip !== false && flowEntity) {
+      const value = chipValue(this._hass?.states?.[flowEntity], locale);
       if (value !== null) chips.push(`<span>${esc(strings.flow(value))}</span>`);
     }
-    if (config.show_volume_chip !== false && config.volume_entity) {
-      const value = chipValue(this._hass?.states?.[config.volume_entity], locale);
+    if (config.show_volume_chip !== false && volumeEntity) {
+      const value = chipValue(this._hass?.states?.[volumeEntity], locale);
       if (value !== null) chips.push(`<span>${esc(strings.volume(value))}</span>`);
     }
     if (config.show_next_change_chip !== false && program) {
@@ -1195,6 +1275,9 @@ export class WaterFlowCard extends HTMLElementBase {
       subRow.push(`<button class="sub" type="button" data-act="schedule" data-focus="slots" title="${esc(strings.windowsAria)}"><ha-icon icon="mdi:clock-outline"></ha-icon><span class="sub-label">${esc(`${strings.windows}: ${windowLabel}`)}</span></button>`);
       subRow.push(`<button class="sub" type="button" data-act="schedule" data-focus="frequency" title="${esc(strings.frequency)}"><ha-icon icon="mdi:calendar-sync"></ha-icon><span class="sub-label">${esc(frequency)}</span></button>`);
     }
+    const batteryButton = config.show_battery_button !== false && batteryEntity
+      ? `<button class="battery-button" type="button" data-act="battery" aria-label="${esc(batteryLabel)}" title="${esc(batteryLabel)}"><ha-icon icon="mdi:battery"></ha-icon><span class="battery-value">${esc(batteryValue)}</span></button>`
+      : '';
     const ariaAction = config.tap_action === 'more-info' ? strings.actionMoreInfo
       : config.tap_action === 'none' ? strings.actionNone : strings.togglePump;
     const backdrop = state ? strings.openDetails(cardTitle(config, this._hass)) : strings.unavailable;
@@ -1212,6 +1295,7 @@ export class WaterFlowCard extends HTMLElementBase {
             </div>
           </div>
           <div class="side">
+            ${batteryButton}
             ${config.show_schedule_button !== false ? `<button class="round" type="button" data-act="schedule" data-focus="slots" aria-label="${esc(strings.windowsAria)}"><ha-icon icon="mdi:calendar-clock"></ha-icon></button>` : ''}
           </div>
         </div>
@@ -1231,6 +1315,7 @@ export class WaterFlowCard extends HTMLElementBase {
       const act = target.dataset.act;
       if (act === 'card') { this._cardAction(); return; }
       if (act === 'auto') { this._toggleAuto(); return; }
+      if (act === 'battery') { this._batteryAction(); return; }
       if (act === 'schedule') { this._scheduleOpener = target; this.openSchedule(target.dataset.focus || 'slots'); return; }
     });
     root.addEventListener('keydown', (event) => {
@@ -1260,6 +1345,14 @@ export class WaterFlowCard extends HTMLElementBase {
     fireHaptic(this.config.haptics !== false, this.config.haptics_style);
     const call = toggleAutoCall(auto);
     this._service(call.domain, call.service, call.data);
+  }
+
+  _batteryAction() {
+    const entity = this._sensorEntity('battery_entity', 'battery');
+    if (!entity) return Promise.resolve();
+    this._clearCardServiceError();
+    fireHaptic(this.config.haptics !== false, this.config.haptics_style);
+    return this._service('more', 'more-info', { entity_id: entity });
   }
 
   // --- Schedule dialog -------------------------------------------------

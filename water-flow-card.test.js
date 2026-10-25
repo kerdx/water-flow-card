@@ -12,7 +12,7 @@ import {
   CARD_SURFACES, CARD_ACTIONS, HAPTIC_STYLES, ANIMATION_DURATION_DEFAULT, MAX_SLOTS, MAX_DURATION_MINUTES,
   MAX_FREQUENCY_DAYS, WATER_FLOW_DOMAIN, numeric, formatNumber, formatDuration, chipValue, sessionMinutes,
   pumpStateLabel, cardTitle, frequencyAllows, activeSlotFor, activeProgram, nextWindowMs, timeMinutes, stepScheduleValue,
-  programSensor, programOf, scheduleDraft, emptyScheduleDraft, validateScheduleDraft, programPayload,
+  programSensor, programOf, discoverSensorEntity, scheduleDraft, emptyScheduleDraft, validateScheduleDraft, programPayload,
   deleteProgramPayload, actionCall, toggleAutoCall, hapticPattern, fireHaptic,
 } from './custom_components/water_flow_scheduler/www/water-flow-card.js';
 
@@ -24,6 +24,7 @@ const states = {
   'input_boolean.irrigazione_attiva': { state: 'on', attributes: {} },
   'sensor.portata_irrigazione': { state: '12.5', attributes: { unit_of_measurement: 'L/min' } },
   'sensor.volume_irrigazione': { state: '3.2', attributes: { unit_of_measurement: 'm³' } },
+  'sensor.batteria_irrigazione': { state: '87', attributes: { unit_of_measurement: '%' } },
   'sensor.water_flow_scheduler_programs': {
     state: 'ready',
     attributes: {
@@ -101,11 +102,12 @@ test('schema selectors describe the water entities and card options', () => {
   assert.deepEqual(fields.find((entry) => entry.name === 'entity').selector.entity, { filter: { domain: ['switch'] } });
   assert.deepEqual(fields.find((entry) => entry.name === 'auto_entity').selector.entity, { filter: { domain: ['input_boolean'] } });
   assert.deepEqual(fields.find((entry) => entry.name === 'flow_entity').selector.entity, { filter: { domain: ['sensor'] } });
+  assert.deepEqual(fields.find((entry) => entry.name === 'battery_entity').selector.entity, { filter: { domain: ['sensor'] } });
   assert.deepEqual(fields.find((entry) => entry.name === 'layout').selector, { select: { mode: 'dropdown', options: ['pill', 'compact'] } });
   assert.deepEqual(fields.find((entry) => entry.name === 'surface').selector, { select: { mode: 'dropdown', options: CARD_SURFACES } });
   assert.deepEqual(fields.find((entry) => entry.name === 'tap_action').selector, { select: { mode: 'dropdown', options: CARD_ACTIONS } });
-  for (const name of ['name', 'icon', 'accent_color', 'language', 'program_entity', 'show_state_chip', 'show_flow_chip',
-    'show_volume_chip', 'show_next_change_chip', 'show_unavailable_badge', 'show_auto_button', 'show_schedule_button',
+  for (const name of ['name', 'icon', 'accent_color', 'language', 'program_entity', 'battery_entity', 'show_state_chip', 'show_flow_chip',
+    'show_volume_chip', 'show_battery_button', 'show_next_change_chip', 'show_unavailable_badge', 'show_auto_button', 'show_schedule_button',
     'hold_action', 'double_tap_action', 'haptics', 'haptics_style', 'animations', 'animation_duration']) {
     assert.ok(names.includes(name), name);
   }
@@ -114,7 +116,7 @@ test('schema selectors describe the water entities and card options', () => {
 test('defaults, suggestion and stub config nest the card type', () => {
   assert.deepEqual(defaultCardConfig('switch.irrigazione'), {
     entity: 'switch.irrigazione', layout: 'pill',
-    show_state_chip: true, show_flow_chip: true, show_volume_chip: true, show_next_change_chip: true,
+    show_state_chip: true, show_flow_chip: true, show_volume_chip: true, show_battery_button: true, show_next_change_chip: true,
     show_unavailable_badge: true, show_auto_button: true, show_schedule_button: true,
   });
   assert.deepEqual(getEntitySuggestion({}, 'switch.irrigazione'), {
@@ -128,6 +130,7 @@ test('defaults, suggestion and stub config nest the card type', () => {
   assert.equal(cardDefault('haptics', 'switch.irrigazione'), true);
   assert.equal(cardDefault('surface', 'switch.irrigazione'), 'default');
   assert.equal(cardDefault('show_flow_chip', 'switch.irrigazione'), true);
+  assert.equal(cardDefault('show_battery_button', 'switch.irrigazione'), true);
   assert.deepEqual(CARD_OPTION_DEFAULTS.animation_duration, ANIMATION_DURATION_DEFAULT);
 });
 
@@ -383,14 +386,31 @@ test('program sensor discovery prefers the explicit entity and falls back to the
   assert.equal(programOf(hass, { entity: 'switch.altro' }), null);
 });
 
+test('readout sensors are detected from measurement type and matched to the pump when needed', () => {
+  const hass = fakeHass();
+  assert.equal(discoverSensorEntity(hass, 'switch.irrigazione', 'flow'), 'sensor.portata_irrigazione');
+  assert.equal(discoverSensorEntity(hass, 'switch.irrigazione', 'volume'), 'sensor.volume_irrigazione');
+  assert.equal(discoverSensorEntity(hass, 'switch.irrigazione', 'battery'), 'sensor.batteria_irrigazione');
+
+  const multipleBatteries = fakeHass({ states: {
+    'switch.pompa_serra': { state: 'off', attributes: { friendly_name: 'Serra pompa' } },
+    'sensor.batteria_serra': { state: '80', attributes: { device_class: 'battery', unit_of_measurement: '%' } },
+    'sensor.batteria_soggiorno': { state: '60', attributes: { device_class: 'battery', unit_of_measurement: '%' } },
+  } });
+  assert.equal(discoverSensorEntity(multipleBatteries, 'switch.pompa_serra', 'battery'), 'sensor.batteria_serra');
+  assert.equal(discoverSensorEntity(multipleBatteries, 'switch.altro', 'battery'), null);
+});
+
 test('card markup renders state, readouts and the three sub-buttons', () => {
-  const card = configuredCard({ ...defaultCardConfig('switch.irrigazione'), flow_entity: 'sensor.portata_irrigazione', volume_entity: 'sensor.volume_irrigazione', auto_entity: 'input_boolean.irrigazione_attiva' });
+  const card = configuredCard({ ...defaultCardConfig('switch.irrigazione'), flow_entity: 'sensor.portata_irrigazione', volume_entity: 'sensor.volume_irrigazione', battery_entity: 'sensor.batteria_irrigazione', auto_entity: 'input_boolean.irrigazione_attiva' });
   card._hass = fakeHass();
   const html = card._cardMarkup();
   assert.match(html, /Irrigazione/);
   assert.match(html, /In irrigazione/);
   assert.match(html, /Portata 12,5 L\/min/);
   assert.match(html, /Volume 3,2 m³/);
+  assert.match(html, /data-act="battery" aria-label="Batteria 87 %"/);
+  assert.match(html, /icon="mdi:battery"><\/ha-icon><span class="battery-value">87 %/);
   assert.match(html, /data-act="auto"/);
   assert.match(html, /data-act="schedule" data-focus="slots"/);
   assert.match(html, /data-act="schedule" data-focus="frequency"/);
@@ -424,6 +444,29 @@ test('card markup renders state, readouts and the three sub-buttons', () => {
   const customAccent = configuredCard({ ...defaultCardConfig('switch.irrigazione'), accent_color: '#ff8800' });
   customAccent._hass = fakeHass();
   assert.match(customAccent._cardMarkup(), /style="--water-flow-accent-color:#ff8800;"/);
+  const noBatteryButton = configuredCard({ ...defaultCardConfig('switch.irrigazione'), battery_entity: 'sensor.batteria_irrigazione', show_battery_button: false });
+  noBatteryButton._hass = fakeHass();
+  assert.ok(!noBatteryButton._cardMarkup().includes('data-act="battery"'));
+});
+
+test('battery button opens the configured sensor details and follows sensor updates', async () => {
+  const calls = [];
+  const card = configuredCard({ ...defaultCardConfig('switch.irrigazione'), battery_entity: 'sensor.batteria_irrigazione' });
+  card._hass = fakeHass({ callService: async (...args) => calls.push(args) });
+  const before = card._renderKey();
+  card._hass = fakeHass({
+    states: { ...states, 'sensor.batteria_irrigazione': { state: '42', attributes: { unit_of_measurement: '%' } } },
+    callService: async (...args) => calls.push(args),
+  });
+  assert.notEqual(card._renderKey(), before);
+  await card._batteryAction();
+  assert.deepEqual(calls, [['more', 'more-info', { entity_id: 'sensor.batteria_irrigazione' }]]);
+
+  const autoCalls = [];
+  const autoDetectedCard = configuredCard(defaultCardConfig('switch.irrigazione'));
+  autoDetectedCard._hass = fakeHass({ callService: async (...args) => autoCalls.push(args) });
+  await autoDetectedCard._batteryAction();
+  assert.deepEqual(autoCalls, [['more', 'more-info', { entity_id: 'sensor.batteria_irrigazione' }]]);
 });
 
 test('schedule duration and liters use visible, localized accessible steppers', () => {

@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.2.3
+
+- Automatically detect flow, volume, and battery sensors; manual selections take precedence, and ambiguous matches are left unselected.
+- Add a localized battery button that displays the sensor value and opens its details; it can be hidden from the card editor.
+
 ## v1.2.2
 
 - Align pump-state colors with Climate Flow Card: inactive icons stay neutral, active state uses Home Assistant's switch-on accent, and an explicit `accent_color` remains the override.

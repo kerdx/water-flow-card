@@ -6,12 +6,12 @@
 [![HACS integration](https://img.shields.io/badge/HACS-Integration-18BCF2)](https://www.hacs.xyz/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-Water Flow Scheduler is a Home Assistant integration that includes **Water Flow Card** and an optional backend scheduler for irrigation pumps and valves. The card displays switch status and optional flow and volume sensors. The scheduler saves programs across restarts and controls the switch when automatic mode is active.
+Water Flow Scheduler is a Home Assistant integration that includes **Water Flow Card** and an optional backend scheduler for irrigation pumps and valves. The card displays switch status, optional flow and volume sensors, and a battery sensor button. The scheduler saves programs across restarts and controls the switch when automatic mode is active.
 
 ## Features
 
 - Lovelace card with `pill` and `compact` layouts.
-- Optional flow and volume readouts, schedule editor, and Auto control.
+- Optional flow and volume readouts, a battery sensor button, schedule editor, and Auto control.
 - Persistent weekly schedules with configurable frequency and watering windows.
 - Diagnostic sensor for program status and errors.
 - Automatic card registration; no manual Lovelace resource is needed.
@@ -35,13 +35,14 @@ Copy `custom_components/water_flow_scheduler` into `<config>/custom_components/`
 ```yaml
 type: custom:water-flow-card
 entity: switch.garden_pump
-flow_entity: sensor.garden_flow       # optional
-volume_entity: sensor.garden_volume   # optional
+flow_entity: sensor.garden_flow       # optional override; otherwise auto-detected
+volume_entity: sensor.garden_volume   # optional override; otherwise auto-detected
+battery_entity: sensor.garden_battery # optional override; button opens sensor details
 auto_entity: input_boolean.garden_auto # optional
 layout: pill                          # pill | compact
 ```
 
-Use the visual card editor or YAML to customize the name, icon, colors, language, visible controls, and tap actions. The scheduler sensor is discovered automatically; set `program_entity` only if you want to select it explicitly.
+Use the visual card editor or YAML to customize the name, icon, colors, language, visible controls, and tap actions. Flow, volume, and battery sensors are detected from their device class/units and matched to the pump name when possible; explicitly configured entities always take precedence. If multiple matching sensors cannot be distinguished, set the desired entity in the editor or YAML. The scheduler sensor is also discovered automatically; set `program_entity` only if you want to select it explicitly.
 
 ## Scheduler
 
