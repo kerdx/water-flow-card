@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.2.1
+
+- Replace hard-to-see native number spinners with accessible, theme-aware duration and liters steppers; isolate the keyboard action from neighboring controls.
+- Turn off scheduler-owned pumps before disabling, deleting, or handing a program to Auto-off control; keep Auto-off manual behavior unchanged.
+- Align active-window status and next-change forecasts with the frequency cycle, surface manual service errors, and keep the elapsed watering timer accurate and updating.
+- Localize the new scheduler-control release error in English and Italian.
+
 ## v1.2.0
 
 - Redesign the irrigation schedule editor with a weekly overview, clearer frequency and watering-window sections, conditional anchor dates, and an entity picker for the Auto helper.
