@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.2
+
+- Remove browser-native frequency spinners entirely by using a numeric-keyboard text field; custom steppers and 1–31 day validation remain in place.
+
 ## v1.3.1
 
 - Replace the frequency field's old stepper appearance with polished up/down controls and hide browser-native number spinners.

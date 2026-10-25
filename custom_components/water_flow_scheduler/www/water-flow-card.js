@@ -1235,8 +1235,7 @@ const CARD_CSS = `
   .frequency-step:disabled{opacity:.38;cursor:not-allowed;box-shadow:none}
   .frequency-step:active:not(:disabled){transform:scale(.94)}
   .frequency-step:focus-visible{outline:2px solid var(--primary-color);outline-offset:1px}
-  .frequency-control .input.num{width:42px;height:44px;min-height:44px;padding:0;border:0;background:transparent;color:var(--primary-text-color);font-size:19px;font-weight:750;text-align:center;font-variant-numeric:tabular-nums;appearance:textfield;-moz-appearance:textfield;-webkit-appearance:none}
-  .frequency-control input[type="number"]::-webkit-inner-spin-button,.frequency-control input[type="number"]::-webkit-outer-spin-button{display:none;-webkit-appearance:none;margin:0}
+  .frequency-control .input.num{width:42px;height:44px;min-height:44px;padding:0;border:0;background:transparent;color:var(--primary-text-color);font-size:19px;font-weight:750;text-align:center;font-variant-numeric:tabular-nums}
   .frequency-unit{min-width:30px;padding:0 2px;color:var(--secondary-text-color);font-size:12px;font-weight:650;white-space:nowrap}
   .field-stack{display:flex;flex-direction:column;gap:12px;padding:14px 0;border-bottom:1px solid var(--divider-color);scroll-margin:10px}
   .mode-picker{display:flex;flex-direction:column;gap:9px}
@@ -2005,7 +2004,7 @@ export class WaterFlowCard extends HTMLElementBase {
               <div class="frequency-control" role="group" aria-label="${esc(strings.frequency)}">
                 <span class="frequency-mark" aria-hidden="true"><ha-icon icon="mdi:calendar-sync"></ha-icon></span>
                 <span class="frequency-value">
-                  <input class="input num" id="wf-frequency" type="number" min="1" max="${MAX_FREQUENCY_DAYS}" step="1" aria-label="${esc(strings.frequency)}" aria-describedby="wf-frequency-help" data-field="frequency_days" value="${esc(draft.frequency_days)}">
+                  <input class="input num" id="wf-frequency" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="off" aria-label="${esc(strings.frequency)}" aria-describedby="wf-frequency-help" data-field="frequency_days" value="${esc(draft.frequency_days)}">
                   <span class="frequency-unit" data-role="frequency-unit">${esc(strings.frequencyUnit(numeric(draft.frequency_days) ?? 1))}</span>
                 </span>
                 <span class="frequency-stepper">

@@ -838,10 +838,9 @@ test('schedule dialog renders the localized bounded frequency stepper', () => {
   assert.match(card._dialog.innerHTML, /class="frequency-stepper"/);
   assert.match(card._dialog.innerHTML, /data-act="step-frequency" data-direction="-1" aria-label="Riduci l’intervallo di un giorno"[^]*icon="mdi:chevron-down"/);
   assert.match(card._dialog.innerHTML, /data-act="step-frequency" data-direction="1" aria-label="Aumenta l’intervallo di un giorno"[^]*icon="mdi:chevron-up"/);
-  assert.match(card._dialog.innerHTML, /id="wf-frequency" type="number" min="1" max="31" step="1"/);
+  assert.match(card._dialog.innerHTML, /id="wf-frequency" type="text" inputmode="numeric" pattern="\[0-9\]\*" maxlength="2"/);
+  assert.doesNotMatch(card._dialog.innerHTML, /id="wf-frequency" type="number"/);
   assert.match(card._dialog.innerHTML, /class="frequency-unit" data-role="frequency-unit">giorni/);
-  assert.match(cardSource(), /\.frequency-control \.input\.num\{[^}]*appearance:textfield;-moz-appearance:textfield;-webkit-appearance:none/);
-  assert.match(cardSource(), /frequency-control input\[type="number"\]::-webkit-inner-spin-button[^}]*display:none/);
 });
 
 test('frequency unit and stepper disabled states follow the selected bounds', () => {
