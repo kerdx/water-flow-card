@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.1
+
+- Replace the frequency field's old stepper appearance with polished up/down controls and hide browser-native number spinners.
+- Refine the pump entity picker with a theme-aware field and localized selection prompt while retaining its switch-only filter.
+
 ## v1.3.0
 
 - Refine schedule frequency and repeat-mode controls with localized day units and accessible increment/decrement buttons bounded to 1–31 days.

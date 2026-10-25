@@ -80,6 +80,7 @@ const STRINGS = {
     increaseFrequency: 'Increase interval by one day',
     decreaseFrequency: 'Decrease interval by one day',
     pumpSelectorLabel: 'Pump connection',
+    pumpPlaceholder: 'Choose the switch that controls the pump',
     intervalFrequencyHelp: 'Repeat every watering window every N days from the start date.',
     legacyFrequencyHelp: 'The schedule checks your selected weekdays on a repeating N-day cycle.',
     legacyMode: 'Existing combined schedule',
@@ -307,6 +308,7 @@ const STRINGS = {
     increaseFrequency: 'Aumenta l’intervallo di un giorno',
     decreaseFrequency: 'Riduci l’intervallo di un giorno',
     pumpSelectorLabel: 'Collegamento pompa',
+    pumpPlaceholder: 'Scegli lo switch che controlla la pompa',
     intervalFrequencyHelp: 'Ripete ogni fascia ogni N giorni a partire dalla data iniziale.',
     legacyFrequencyHelp: 'Il programma verifica i giorni selezionati seguendo un ciclo di N giorni.',
     legacyMode: 'Programma precedente combinato',
@@ -1225,15 +1227,17 @@ const CARD_CSS = `
   .frequency-control:focus-within{border-color:var(--water-flow-accent-color);box-shadow:0 0 0 3px color-mix(in srgb,var(--water-flow-accent-color) 16%,transparent)}
   .frequency-mark{width:36px;height:36px;flex:0 0 36px;display:grid;place-items:center;border-radius:11px;background:color-mix(in srgb,var(--water-flow-accent-color) 14%,var(--secondary-background-color));color:var(--water-flow-accent-color)}
   .frequency-mark ha-icon{--mdc-icon-size:19px}
-  .frequency-step{width:44px;height:44px;flex:0 0 44px;display:grid;place-items:center;padding:0;border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color,var(--ha-card-background));color:var(--primary-text-color);cursor:pointer;transition:background .16s,border-color .16s,color .16s,transform .12s}
-  .frequency-step ha-icon{--mdc-icon-size:18px}
-  .frequency-step:hover{border-color:var(--water-flow-accent-color);color:var(--water-flow-accent-color)}
-  .frequency-step:disabled{opacity:.42;cursor:not-allowed;transform:none}
-  .frequency-step:active{transform:scale(.94);background:color-mix(in srgb,var(--water-flow-accent-color) 12%,var(--secondary-background-color))}
+  .frequency-value{display:flex;align-items:baseline;justify-content:center;gap:3px;min-width:78px;padding:0 3px}
+  .frequency-stepper{display:flex;align-items:center;gap:5px;padding:3px;border:1px solid color-mix(in srgb,var(--water-flow-accent-color) 24%,var(--divider-color));border-radius:16px;background:color-mix(in srgb,var(--water-flow-accent-color) 5%,var(--secondary-background-color));box-shadow:inset 0 1px 2px rgba(0,0,0,.08)}
+  .frequency-step{width:44px;height:44px;flex:0 0 44px;display:grid;place-items:center;padding:0;border:1px solid color-mix(in srgb,var(--water-flow-accent-color) 20%,var(--divider-color));border-radius:14px;background:linear-gradient(155deg,var(--card-background-color,var(--ha-card-background)),color-mix(in srgb,var(--water-flow-accent-color) 6%,var(--secondary-background-color)));box-shadow:0 2px 6px rgba(0,0,0,.1);color:var(--secondary-text-color);cursor:pointer;transition:background .16s,border-color .16s,color .16s,box-shadow .16s,transform .12s}
+  .frequency-step ha-icon{--mdc-icon-size:23px}
+  .frequency-step:hover:not(:disabled){border-color:var(--water-flow-accent-color);background:var(--water-flow-accent-color);box-shadow:0 4px 10px color-mix(in srgb,var(--water-flow-accent-color) 28%,transparent);color:var(--text-primary-color,#fff);transform:translateY(-1px)}
+  .frequency-step:disabled{opacity:.38;cursor:not-allowed;box-shadow:none}
+  .frequency-step:active:not(:disabled){transform:scale(.94)}
   .frequency-step:focus-visible{outline:2px solid var(--primary-color);outline-offset:1px}
-  .frequency-control .input.num{width:54px;height:44px;min-height:44px;padding:0;border:0;background:transparent;color:var(--primary-text-color);font-size:18px;font-weight:750;text-align:center;font-variant-numeric:tabular-nums;-moz-appearance:textfield}
-  .frequency-control input[type="number"]::-webkit-inner-spin-button,.frequency-control input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
-  .frequency-unit{min-width:34px;padding:0 4px;color:var(--secondary-text-color);font-size:12px;font-weight:650}
+  .frequency-control .input.num{width:42px;height:44px;min-height:44px;padding:0;border:0;background:transparent;color:var(--primary-text-color);font-size:19px;font-weight:750;text-align:center;font-variant-numeric:tabular-nums;appearance:textfield;-moz-appearance:textfield;-webkit-appearance:none}
+  .frequency-control input[type="number"]::-webkit-inner-spin-button,.frequency-control input[type="number"]::-webkit-outer-spin-button{display:none;-webkit-appearance:none;margin:0}
+  .frequency-unit{min-width:30px;padding:0 2px;color:var(--secondary-text-color);font-size:12px;font-weight:650;white-space:nowrap}
   .field-stack{display:flex;flex-direction:column;gap:12px;padding:14px 0;border-bottom:1px solid var(--divider-color);scroll-margin:10px}
   .mode-picker{display:flex;flex-direction:column;gap:9px}
   .mode-picker-title{font-size:13px;font-weight:650;color:var(--primary-text-color)}
@@ -2000,10 +2004,14 @@ export class WaterFlowCard extends HTMLElementBase {
               <div><label for="wf-frequency">${esc(strings.frequency)}</label><div class="hint" id="wf-frequency-help" data-role="frequency-help">${esc(frequencyHelpForMode(mode, strings))}</div></div>
               <div class="frequency-control" role="group" aria-label="${esc(strings.frequency)}">
                 <span class="frequency-mark" aria-hidden="true"><ha-icon icon="mdi:calendar-sync"></ha-icon></span>
-                <button class="frequency-step" type="button" data-act="step-frequency" data-direction="-1" aria-label="${esc(strings.decreaseFrequency)}" aria-controls="wf-frequency"><ha-icon icon="mdi:minus"></ha-icon></button>
-                <input class="input num" id="wf-frequency" type="number" min="1" max="${MAX_FREQUENCY_DAYS}" step="1" aria-label="${esc(strings.frequency)}" aria-describedby="wf-frequency-help" data-field="frequency_days" value="${esc(draft.frequency_days)}">
-                <button class="frequency-step" type="button" data-act="step-frequency" data-direction="1" aria-label="${esc(strings.increaseFrequency)}" aria-controls="wf-frequency"><ha-icon icon="mdi:plus"></ha-icon></button>
-                <span class="frequency-unit" data-role="frequency-unit">${esc(strings.frequencyUnit(numeric(draft.frequency_days) ?? 1))}</span>
+                <span class="frequency-value">
+                  <input class="input num" id="wf-frequency" type="number" min="1" max="${MAX_FREQUENCY_DAYS}" step="1" aria-label="${esc(strings.frequency)}" aria-describedby="wf-frequency-help" data-field="frequency_days" value="${esc(draft.frequency_days)}">
+                  <span class="frequency-unit" data-role="frequency-unit">${esc(strings.frequencyUnit(numeric(draft.frequency_days) ?? 1))}</span>
+                </span>
+                <span class="frequency-stepper">
+                  <button class="frequency-step" type="button" data-act="step-frequency" data-direction="-1" aria-label="${esc(strings.decreaseFrequency)}" aria-controls="wf-frequency"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
+                  <button class="frequency-step" type="button" data-act="step-frequency" data-direction="1" aria-label="${esc(strings.increaseFrequency)}" aria-controls="wf-frequency"><ha-icon icon="mdi:chevron-up"></ha-icon></button>
+                </span>
               </div>
             </div>
             <div class="row-field" data-role="anchor-row" ${mode !== 'weekdays' && Number(draft.frequency_days) > 1 ? '' : 'hidden'}>
@@ -2512,7 +2520,7 @@ const EDITOR_CSS = `
   .pump-picker-icon ha-icon{--mdc-icon-size:23px}
   .pump-picker-content{display:flex;flex:1 1 auto;flex-direction:column;gap:1px;min-width:0}
   .pump-picker-caption{padding-left:8px;color:var(--secondary-text-color);font-size:10px;font-weight:750;letter-spacing:.09em;text-transform:uppercase}
-  .pump-picker ha-entity-picker{flex:1 1 auto;width:100%;max-width:none;min-width:0;--mdc-theme-primary:var(--water-flow-accent-color,var(--primary-color));--mdc-text-field-fill-color:transparent;--mdc-text-field-idle-line-color:transparent;--mdc-text-field-hover-line-color:var(--divider-color);--mdc-text-field-focused-line-color:var(--water-flow-accent-color,var(--primary-color))}
+  .pump-picker ha-entity-picker{flex:1 1 auto;width:100%;max-width:none;min-width:0;--mdc-theme-primary:var(--water-flow-accent-color,var(--primary-color));--mdc-text-field-fill-color:transparent;--mdc-text-field-idle-line-color:transparent;--mdc-text-field-hover-line-color:var(--divider-color);--mdc-text-field-focused-line-color:var(--water-flow-accent-color,var(--primary-color));--ha-color-form-background:color-mix(in srgb,var(--water-flow-accent-color,var(--primary-color)) 5%,transparent);--ha-color-border-neutral-loud:transparent;--ha-border-radius-sm:12px}
   .sw{appearance:none;-webkit-appearance:none;align-self:flex-end;flex:0 0 auto;position:relative;width:48px;height:44px;border-radius:999px;background:linear-gradient(var(--divider-color),var(--divider-color)) center/44px 28px no-repeat;border:0;margin:0;cursor:pointer;transition:background .2s}
   .sw:after{content:'';position:absolute;top:11px;left:5px;width:22px;height:22px;border-radius:50%;background:var(--text-primary-color,#fff);transition:transform .2s}
   .sw:checked{background:linear-gradient(var(--water-flow-accent-color,var(--primary-color)),var(--water-flow-accent-color,var(--primary-color))) center/44px 28px no-repeat}
@@ -2582,7 +2590,8 @@ export class WaterFlowCardEditor extends HTMLElementBase {
     const selector = entry.selector;
     let control = '';
     if (selector.entity) {
-      const picker = `<ha-entity-picker data-field="${name}" aria-label="${label}" allow-custom-entity></ha-entity-picker>`;
+      const placeholder = name === 'entity' ? `placeholder="${esc(strings.pumpPlaceholder)}"` : '';
+      const picker = `<ha-entity-picker data-field="${name}" aria-label="${label}" ${placeholder} allow-custom-entity></ha-entity-picker>`;
       control = name === 'entity'
         ? `<div class="pump-picker" data-role="pump-picker"><span class="pump-picker-icon" aria-hidden="true"><ha-icon icon="mdi:water-pump"></ha-icon></span><div class="pump-picker-content"><span class="pump-picker-caption">${esc(strings.pumpSelectorLabel)}</span>${picker}</div></div>`
         : picker;

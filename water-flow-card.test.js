@@ -817,6 +817,8 @@ test('frequency stepper clamps to 1–31 days and localizes unit and accessible 
   assert.equal(cardStrings('it').decreaseFrequency, 'Riduci l’intervallo di un giorno');
   assert.equal(cardStrings('en').pumpSelectorLabel, 'Pump connection');
   assert.equal(cardStrings('it').pumpSelectorLabel, 'Collegamento pompa');
+  assert.equal(cardStrings('en').pumpPlaceholder, 'Choose the switch that controls the pump');
+  assert.equal(cardStrings('it').pumpPlaceholder, 'Scegli lo switch che controlla la pompa');
 });
 
 test('schedule dialog renders the localized bounded frequency stepper', () => {
@@ -833,10 +835,13 @@ test('schedule dialog renders the localized bounded frequency stepper', () => {
   card._fillDialog();
 
   assert.match(card._dialog.innerHTML, /class="frequency-control"/);
-  assert.match(card._dialog.innerHTML, /data-act="step-frequency" data-direction="-1" aria-label="Riduci l’intervallo di un giorno"/);
-  assert.match(card._dialog.innerHTML, /data-act="step-frequency" data-direction="1" aria-label="Aumenta l’intervallo di un giorno"/);
+  assert.match(card._dialog.innerHTML, /class="frequency-stepper"/);
+  assert.match(card._dialog.innerHTML, /data-act="step-frequency" data-direction="-1" aria-label="Riduci l’intervallo di un giorno"[^]*icon="mdi:chevron-down"/);
+  assert.match(card._dialog.innerHTML, /data-act="step-frequency" data-direction="1" aria-label="Aumenta l’intervallo di un giorno"[^]*icon="mdi:chevron-up"/);
   assert.match(card._dialog.innerHTML, /id="wf-frequency" type="number" min="1" max="31" step="1"/);
   assert.match(card._dialog.innerHTML, /class="frequency-unit" data-role="frequency-unit">giorni/);
+  assert.match(cardSource(), /\.frequency-control \.input\.num\{[^}]*appearance:textfield;-moz-appearance:textfield;-webkit-appearance:none/);
+  assert.match(cardSource(), /frequency-control input\[type="number"\]::-webkit-inner-spin-button[^}]*display:none/);
 });
 
 test('frequency unit and stepper disabled states follow the selected bounds', () => {
@@ -1070,6 +1075,8 @@ test('editor row markup binds every selector to a localized label', () => {
   assert.match(row('entity'), /icon="mdi:water-pump"/);
   assert.match(row('entity'), /Collegamento pompa/);
   assert.match(row('entity'), /aria-label="Switch pompa"/);
+  assert.match(row('entity'), /placeholder="Scegli lo switch che controlla la pompa"/);
+  assert.match(editor._rowMarkup(configSchemaFields().find((entry) => entry.name === 'entity'), cardStrings('en')), /placeholder="Choose the switch that controls the pump"/);
   assert.match(row('auto_entity'), /data-field="auto_entity"/);
   assert.match(row('show_flow_chip'), /role="switch"/);
   assert.match(row('layout'), /data-value="pill"/);
