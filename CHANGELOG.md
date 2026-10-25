@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.2.10
+
+- Make the card, schedule dialog, and configuration editor mobile-first with larger touch targets, wrapping status chips, responsive window controls, and desktop layouts restored on wider screens.
+
 ## v1.2.9
 
 - Fix schedule evaluation and next-change forecasts across spring and autumn daylight-saving transitions, including overnight windows on skipped frequency days.

@@ -1052,6 +1052,21 @@ test('card source keeps the dialog, the scheduler services and no prompts', () =
   assert.doesNotMatch(source, /climate\./);
 });
 
+test('card and editors use mobile-first layouts with desktop-width enhancements', () => {
+  const source = cardSource();
+  const desktopBreakpoint = source.indexOf('@media(min-width:521px)');
+  assert.ok(desktopBreakpoint > 0);
+  assert.ok(source.indexOf('.status-line{display:flex;flex-wrap:wrap') < desktopBreakpoint);
+  assert.match(source, /\.round\{width:44px;height:44px/);
+  assert.match(source, /\.sub\{[^}]*min-height:44px/);
+  assert.match(source, /\.days\{display:grid;grid-template-columns:repeat\(4,minmax\(44px,1fr\)\)/);
+  assert.match(source, /\.day\{min-width:44px;min-height:44px/);
+  assert.match(source, /\.dlg-actions-right \.btn\{flex:1 1 0;min-height:44px\}/);
+  assert.match(source, /\.ed-row\{display:flex;flex-direction:column;align-items:stretch/);
+  assert.match(source, /@media\(min-width:521px\)\{\s*\.ed-row\{flex-direction:row;align-items:center\}/);
+  assert.doesNotMatch(source, /@media\(max-width:520px\)/);
+});
+
 test('card-picker entry is added without a DOM and registers both elements', () => {
   const win = { customCards: [] };
   const previousWindow = globalThis.window;
