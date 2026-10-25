@@ -1228,7 +1228,10 @@ export class WaterFlowCard extends HTMLElementBase {
     const locale = cardLanguage(config, this._hass) === 'it' ? 'it-IT' : 'en-US';
     const chips = [];
     const stateLabel = unavailable ? strings.unavailable : pumpStateLabel(status, strings);
-    const batteryValue = chipValue(batteryState, locale) ?? strings.unavailable;
+    const batteryReading = chipValue(batteryState, locale);
+    const batteryValue = batteryReading === null
+      ? strings.unavailable
+      : entityUnit(batteryState) ? batteryReading : `${batteryReading} %`;
     const batteryLabel = strings.battery(batteryValue);
     if (config.show_state_chip !== false) {
       chips.push(`<span class="state-chip${running ? ' live' : ''}" data-state="${esc(status || 'unavailable')}">${esc(stateLabel)}</span>`);

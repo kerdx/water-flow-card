@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.2.5
+
+- Show battery readings as percentages when the sensor does not provide a unit of measurement.
+
 ## v1.2.4
 
 - Improve hover and pressed feedback for the battery button.

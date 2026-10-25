@@ -478,6 +478,17 @@ test('battery button opens the configured sensor details and follows sensor upda
   assert.equal(autoEvents[0].detail.entityId, 'sensor.batteria_irrigazione');
 });
 
+test('battery sensor without a unit still displays its percentage', () => {
+  const card = configuredCard({ ...defaultCardConfig('switch.irrigazione'), battery_entity: 'sensor.irrigazione_battery' });
+  card._hass = fakeHass({ states: {
+    ...states,
+    'sensor.irrigazione_battery': { state: '100', attributes: { device_class: 'battery' } },
+  } });
+  const html = card._cardMarkup();
+  assert.match(html, /aria-label="Batteria 100 %"/);
+  assert.match(html, /<span class="battery-value">100 %<\/span>/);
+});
+
 test('more-info card action uses the Home Assistant event instead of a service call', () => {
   const calls = [];
   const events = [];
