@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.2.8
+
+- Match Climate Flow Card's active schedule accent and add theme-aware whole-card hover and press feedback.
+
 ## v1.2.7
 
 - Unify schedule editing with mutually exclusive weekday and every-N-days modes while preserving the combined behavior of existing programs until they are changed.

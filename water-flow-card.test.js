@@ -502,14 +502,15 @@ test('card markup renders state, readouts and optional valve feedback control', 
   assert.match(html, /class="irrigation-end-chip">Fine · /);
   assert.match(html, /data-act="shortage-protection" data-active="true" aria-pressed="true"/);
   assert.match(html, /Protezione acqua · Attiva/);
-  assert.match(html, /data-act="schedule" data-focus="slots"/);
-  assert.match(html, /data-act="schedule" data-focus="frequency"/);
+  assert.match(html, /data-act="schedule" data-active="true" data-focus="slots"/);
+  assert.match(html, /data-act="schedule" data-active="true" data-focus="frequency"/);
+  assert.match(html, /class="round" type="button" data-act="schedule" data-active="true"/);
   assert.match(html, /Ogni 2 giorni/);
   assert.match(html, /data-running="true"/);
   assert.match(html, /class="state-chip live" data-state="on">In irrigazione/);
   assert.match(html, /aria-label="Irrigazione · In irrigazione"/);
   assert.match(html, /role="button" tabindex="0" data-act="card"/);
-  assert.match(html, /data-act="schedule" data-focus="slots" aria-label=/);
+  assert.match(html, /data-act="schedule" data-active="true" data-focus="slots" aria-label=/);
   assert.match(html, /class="row-content"[^]*<\/div>\s*<div class="side">/);
   assert.match(html, /mdi:water-pump/);
   // The card never injects unescaped entity names.
@@ -527,10 +528,27 @@ test('card markup renders state, readouts and optional valve feedback control', 
   assert.match(offHtml, /data-running="false"/);
   assert.match(offHtml, /class="state-chip" data-state="off">Spenta/);
   assert.match(offHtml, /aria-label="Irrigazione · Spenta"/);
+  const disabledSchedule = configuredCard(defaultCardConfig('switch.irrigazione'));
+  disabledSchedule._hass = fakeHass({ states: {
+    ...states,
+    'sensor.water_flow_scheduler_programs': {
+      ...states['sensor.water_flow_scheduler_programs'],
+      attributes: {
+        ...states['sensor.water_flow_scheduler_programs'].attributes,
+        programs: { 'switch.irrigazione': { ...states['sensor.water_flow_scheduler_programs'].attributes.programs['switch.irrigazione'], enabled: false } },
+      },
+    },
+  } });
+  assert.match(disabledSchedule._cardMarkup(), /data-act="schedule" data-active="false"/);
   assert.match(cardSource(), /ha-card\[data-running="true"\]\{--water-flow-accent-color:var\(--state-switch-on-color,var\(--primary-color\)\)\}/);
   assert.match(cardSource(), /ha-card\[data-running="true"\] \.icon\{background:var\(--water-flow-accent-color\)/);
   assert.match(cardSource(), /ha-card\[data-running="true"\]:not\(\[data-surface="blend"\]\).*background-color:color-mix/);
   assert.match(cardSource(), /ha-card\[data-running="true"\]\[data-surface="blend"\].*box-shadow:inset/);
+  assert.match(cardSource(), /ha-card:not\(\[data-surface="blend"\]\):hover\{background-color:color-mix\(in srgb,var\(--water-flow-accent-color\) 5%/);
+  assert.match(cardSource(), /ha-card\[data-surface="blend"\]:hover\{background-color:color-mix\(in srgb,var\(--water-flow-accent-color\) 5%,transparent\)\}/);
+  assert.match(cardSource(), /ha-card:not\(\[data-surface="blend"\]\)\.card-press-feedback\{background-color:color-mix\(in srgb,var\(--water-flow-accent-color\) 9%/);
+  assert.match(cardSource(), /ha-card\[data-surface="blend"\]\.card-press-feedback\{background-color:color-mix\(in srgb,var\(--water-flow-accent-color\) 9%,transparent\)\}/);
+  assert.match(cardSource(), /\.sub\[data-act="schedule"\]\[data-active="true"\],\.round\[data-active="true"\]\{background:var\(--water-flow-accent-color\);border-color:var\(--water-flow-accent-color\);color:var\(--text-primary-color,#fff\)\}/);
   const customAccent = configuredCard({ ...defaultCardConfig('switch.irrigazione'), accent_color: '#ff8800' });
   customAccent._hass = fakeHass();
   assert.match(customAccent._cardMarkup(), /style="--water-flow-accent-color:#ff8800;"/);
@@ -549,6 +567,37 @@ test('card markup renders state, readouts and optional valve feedback control', 
   const noProtectionButton = configuredCard({ ...defaultCardConfig('switch.irrigazione'), shortage_protection_entity: 'switch.irrigazione_auto_close_when_water_shortage', show_shortage_protection_button: false });
   noProtectionButton._hass = fakeHass();
   assert.ok(!noProtectionButton._cardMarkup().includes('data-act="shortage-protection"'));
+});
+
+test('card surface press feedback responds to primary pointer and click and survives rerender', () => {
+  const card = configuredCard(defaultCardConfig('switch.irrigazione'));
+  const createSurface = () => {
+    const listeners = {};
+    const classes = new Set();
+    return {
+      listeners,
+      classes,
+      classList: { add: (name) => classes.add(name), remove: (name) => classes.delete(name) },
+      addEventListener: (name, callback) => { listeners[name] = callback; },
+    };
+  };
+  let surface = createSurface();
+  card.shadowRoot = { querySelector: () => surface };
+  card._bindCardSurfaceFeedback(surface);
+  surface.listeners.pointerdown({ button: 2 });
+  assert.equal(card._cardPressFeedback, undefined, 'non-primary pointer presses are ignored');
+  surface.listeners.pointerdown({ button: 0 });
+  assert.ok(surface.classes.has('card-press-feedback'));
+
+  const rerenderedSurface = createSurface();
+  surface = rerenderedSurface;
+  card._bindCardSurfaceFeedback(surface);
+  assert.ok(surface.classes.has('card-press-feedback'), 'feedback is restored on the replacement card surface');
+  surface.listeners.click();
+  assert.ok(surface.classes.has('card-press-feedback'), 'click keeps the pressed tint visible');
+  card.disconnectedCallback();
+  assert.equal(card._cardPressFeedback, false, 'disconnect clears the feedback timer and state');
+  assert.ok(!surface.classes.has('card-press-feedback'), 'disconnect clears the pressed visual state');
 });
 
 test('valve feedback button toggles the configured switch and follows sensor updates', async () => {

@@ -1090,12 +1090,17 @@ const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => (
 
 const CARD_CSS = `
   :host{display:block}
-  ha-card{--water-flow-accent-color:var(--primary-color);position:relative;overflow:hidden;cursor:pointer;transition:background-color .22s,border-color .22s,box-shadow .22s}
+  ha-card{--water-flow-accent-color:var(--primary-color);position:relative;overflow:hidden;cursor:pointer;transition:background-color .16s ease,border-color .22s,box-shadow .22s}
   ha-card[data-surface="elevated"]{box-shadow:0 6px 22px rgba(0,0,0,.28);border-color:color-mix(in srgb, var(--water-flow-accent-color) 35%, transparent)}
   ha-card[data-surface="blend"]{background:transparent;border-color:transparent;box-shadow:none}
   ha-card[data-running="true"]{--water-flow-accent-color:var(--state-switch-on-color,var(--primary-color))}
   ha-card[data-running="true"]:not([data-surface="blend"]){background-color:color-mix(in srgb,var(--water-flow-accent-color) 7%,var(--card-background-color,var(--ha-card-background)));border-color:color-mix(in srgb,var(--water-flow-accent-color) 28%,var(--divider-color))}
   ha-card[data-running="true"][data-surface="blend"]{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--water-flow-accent-color) 30%,transparent)}
+  @media(hover:hover) and (pointer:fine){ha-card:not([data-surface="blend"]):hover{background-color:color-mix(in srgb,var(--water-flow-accent-color) 5%,var(--card-background-color,var(--ha-card-background)))}ha-card[data-surface="blend"]:hover{background-color:color-mix(in srgb,var(--water-flow-accent-color) 5%,transparent)}}
+  ha-card:not([data-surface="blend"]).card-press-feedback{background-color:color-mix(in srgb,var(--water-flow-accent-color) 9%,var(--card-background-color,var(--ha-card-background)))}
+  ha-card[data-surface="blend"].card-press-feedback{background-color:color-mix(in srgb,var(--water-flow-accent-color) 9%,transparent)}
+  @media(prefers-reduced-motion:reduce){ha-card{transition:none!important}}
+  ha-card[data-animations="false"]{transition:none!important}
   .row{display:flex;align-items:center;gap:14px;padding:14px 16px}
   .compact .row{padding:12px 14px;gap:12px}
   .row-content{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:14px;cursor:pointer}
@@ -1130,6 +1135,7 @@ const CARD_CSS = `
   .sub ha-icon{--mdc-icon-size:16px;flex:0 0 auto}
   .sub .sub-label{overflow:hidden;text-overflow:ellipsis}
   .sub[data-active="true"]{background:color-mix(in srgb, var(--water-flow-accent-color) 22%, transparent);border-color:color-mix(in srgb, var(--water-flow-accent-color) 55%, transparent);color:var(--water-flow-accent-color)}
+  .sub[data-act="schedule"][data-active="true"],.round[data-active="true"]{background:var(--water-flow-accent-color);border-color:var(--water-flow-accent-color);color:var(--text-primary-color,#fff)}
   .sub:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
   .error{margin:0 14px 12px;padding:8px 10px;border-radius:10px;background:color-mix(in srgb, var(--error-color) 15%, transparent);color:var(--error-color);font-size:12px;line-height:1.35}
   .unavailable{opacity:.6}
@@ -1256,7 +1262,13 @@ export class WaterFlowCard extends HTMLElementBase {
 
   connectedCallback() { this._syncSessionTracking(); }
 
-  disconnectedCallback() { this._stopSessionTicker(); }
+  disconnectedCallback() {
+    this._stopSessionTicker();
+    globalThis.clearTimeout(this._cardSurfaceFeedbackTimer);
+    this._cardSurfaceFeedbackTimer = null;
+    this._cardPressFeedback = false;
+    this.shadowRoot?.querySelector?.('ha-card')?.classList?.remove('card-press-feedback');
+  }
 
   _syncSessionTracking() {
     const entityId = this.config?.entity;
@@ -1286,6 +1298,27 @@ export class WaterFlowCard extends HTMLElementBase {
     if (this._sessionTicker === undefined || this._sessionTicker === null) return;
     globalThis.clearInterval(this._sessionTicker);
     this._sessionTicker = null;
+  }
+
+  _bindCardSurfaceFeedback(card) {
+    if (!card?.addEventListener) return;
+    if (this._cardPressFeedback) card.classList?.add('card-press-feedback');
+    card.addEventListener('pointerdown', (event) => {
+      if (event.button !== undefined && event.button !== 0) return;
+      this._flashCardSurfaceFeedback();
+    }, { passive: true });
+    card.addEventListener('click', () => this._flashCardSurfaceFeedback(), true);
+  }
+
+  _flashCardSurfaceFeedback() {
+    globalThis.clearTimeout(this._cardSurfaceFeedbackTimer);
+    this._cardPressFeedback = true;
+    this.shadowRoot?.querySelector?.('ha-card')?.classList?.add('card-press-feedback');
+    this._cardSurfaceFeedbackTimer = globalThis.setTimeout(() => {
+      this._cardPressFeedback = false;
+      this.shadowRoot?.querySelector?.('ha-card')?.classList?.remove('card-press-feedback');
+      this._cardSurfaceFeedbackTimer = null;
+    }, 260);
   }
 
   _tickSession() {
@@ -1499,6 +1532,7 @@ export class WaterFlowCard extends HTMLElementBase {
     if (key === this._lastRenderKey && this.shadowRoot.querySelector?.('ha-card')) return;
     this._lastRenderKey = key;
     this.shadowRoot.innerHTML = `<style>${CARD_CSS}</style>${this._cardMarkup()}`;
+    this._bindCardSurfaceFeedback(this.shadowRoot.querySelector?.('ha-card'));
     this._bindCardEvents();
     if (this._dialog) {
       // A re-render rebuilds the card body only: the open dialog element is
@@ -1545,6 +1579,7 @@ export class WaterFlowCard extends HTMLElementBase {
     const unavailable = status === 'unavailable' || status === 'unknown';
     const statusView = activeProgram(program, Date.now());
     const running = status === 'on';
+    const scheduleEnabled = program?.enabled === true;
     const accent = normalizeAccentColor(config.accent_color);
     const surface = normalizeSurface(config.surface);
     const layout = normalizeLayout(config.layout);
@@ -1646,8 +1681,8 @@ export class WaterFlowCard extends HTMLElementBase {
       subRow.push(`<button class="sub" type="button" data-act="auto" data-active="${auto?.state === 'on'}" aria-pressed="${auto?.state === 'on'}" title="${esc(autoLabel)}"><ha-icon icon="mdi:calendar-check"></ha-icon><span class="sub-label">${esc(strings.auto)}</span></button>`);
     }
     if (config.show_schedule_button !== false) {
-      subRow.push(`<button class="sub" type="button" data-act="schedule" data-focus="slots" title="${esc(strings.windowsAria)}"><ha-icon icon="mdi:clock-outline"></ha-icon><span class="sub-label">${esc(`${strings.windows}: ${windowLabel}`)}</span></button>`);
-      subRow.push(`<button class="sub" type="button" data-act="schedule" data-focus="frequency" title="${esc(strings.frequency)}"><ha-icon icon="mdi:calendar-sync"></ha-icon><span class="sub-label">${esc(frequency)}</span></button>`);
+      subRow.push(`<button class="sub" type="button" data-act="schedule" data-active="${scheduleEnabled}" data-focus="slots" title="${esc(strings.windowsAria)}"><ha-icon icon="mdi:clock-outline"></ha-icon><span class="sub-label">${esc(`${strings.windows}: ${windowLabel}`)}</span></button>`);
+      subRow.push(`<button class="sub" type="button" data-act="schedule" data-active="${scheduleEnabled}" data-focus="frequency" title="${esc(strings.frequency)}"><ha-icon icon="mdi:calendar-sync"></ha-icon><span class="sub-label">${esc(frequency)}</span></button>`);
     }
     const batteryButton = config.show_battery_button !== false && batteryEntity
       ? `<button class="battery-button" type="button" data-act="battery" aria-label="${esc(batteryLabel)}" title="${esc(batteryLabel)}"><ha-icon icon="mdi:battery"></ha-icon><span class="battery-value">${esc(batteryValue)}</span></button>`
@@ -1670,7 +1705,7 @@ export class WaterFlowCard extends HTMLElementBase {
           </div>
           <div class="side">
             ${batteryButton}
-            ${config.show_schedule_button !== false ? `<button class="round" type="button" data-act="schedule" data-focus="slots" aria-label="${esc(strings.windowsAria)}"><ha-icon icon="mdi:calendar-clock"></ha-icon></button>` : ''}
+            ${config.show_schedule_button !== false ? `<button class="round" type="button" data-act="schedule" data-active="${scheduleEnabled}" data-focus="slots" aria-label="${esc(strings.windowsAria)}"><ha-icon icon="mdi:calendar-clock"></ha-icon></button>` : ''}
           </div>
         </div>
         ${subRow.length ? `<div class="subrow">${subRow.join('')}</div>` : ''}
