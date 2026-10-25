@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.2.9
+
+- Fix schedule evaluation and next-change forecasts across spring and autumn daylight-saving transitions, including overnight windows on skipped frequency days.
+- Use backend-calculated schedule status and the Home Assistant timezone in the card; refresh after closing the editor and keep the anchor date input synchronized with its draft.
+- Simplify the schedule editor by removing the clickable weekly overview; weekday selectors remain in each watering window.
+
 ## v1.2.8
 
 - Match Climate Flow Card's active schedule accent and add theme-aware whole-card hover and press feedback.

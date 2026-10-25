@@ -274,6 +274,13 @@ class EvaluationTests(unittest.TestCase):
             utc(2026, 5, 5, 1, 0),
         )
 
+    def test_legacy_frequency_window_can_finish_on_an_off_cycle_day(self):
+        legacy = validate_program(
+            [window("night", [1], "23:00", 120)], True, 2, "2026-05-04", schedule_mode="legacy"
+        )
+        self.assertEqual(apply_key(legacy, utc(2026, 5, 5, 0, 30)), "night")
+        self.assertEqual(apply_key(legacy, utc(2026, 5, 5, 1, 0)), "blocked")
+
     def test_apply_key_identifies_the_pump_command(self):
         program = validate_program(self.slots, True)
         now = utc(2026, 5, 4, 5, 45)
@@ -338,6 +345,34 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(boundary.utcoffset(), timedelta(hours=2))
         self.assertEqual((boundary.hour, boundary.minute), (3, 0))
         self.assertGreater(boundary, now)
+
+        program = validate_program(slots, True)
+        start = datetime(2026, 3, 29, 3, 0, tzinfo=rome)
+        self.assertEqual(apply_key(program, start), "night")
+        self.assertEqual(apply_key(program, datetime(2026, 3, 29, 3, 29, tzinfo=rome)), "night")
+        self.assertEqual(apply_key(program, datetime(2026, 3, 29, 3, 30, tzinfo=rome)), "off")
+        self.assertEqual(next_boundary(slots, start), datetime(2026, 3, 29, 3, 30, tzinfo=rome))
+
+    def test_dst_fold_uses_one_real_start_and_real_duration(self):
+        rome = ZoneInfo("Europe/Rome")
+        slots = [{"id": "fold", "days": [7], "start": "02:30", "duration": 60}]
+        program = validate_program(slots, True)
+        before = datetime(2026, 10, 24, 12, 0, tzinfo=rome)
+        first_start = datetime(2026, 10, 25, 2, 30, tzinfo=rome, fold=0)
+        repeated_hour = datetime(2026, 10, 25, 2, 0, tzinfo=rome, fold=1)
+        repeated_end = datetime(2026, 10, 25, 2, 30, tzinfo=rome, fold=1)
+
+        self.assertEqual(next_boundary(slots, before).astimezone(timezone.utc), first_start.astimezone(timezone.utc))
+        self.assertEqual(apply_key(program, first_start), "fold")
+        # The pump stays on continuously through the repeated hour, ending
+        # exactly 60 real minutes after the first 02:30 occurrence.
+        self.assertEqual(apply_key(program, repeated_hour), "fold")
+        self.assertEqual(apply_key(program, datetime(2026, 10, 25, 2, 29, tzinfo=rome, fold=1)), "fold")
+        self.assertEqual(apply_key(program, repeated_end), "off")
+        self.assertEqual(
+            next_boundary(slots, first_start).astimezone(timezone.utc),
+            repeated_end.astimezone(timezone.utc),
+        )
 
     def test_availability_action_only_matters_during_a_running_window(self):
         self.assertIsNone(availability_action_fn(False, True, "on", "unavailable"))

@@ -274,49 +274,59 @@ def _slot_intervals(day: int, start: int, duration: int) -> list[tuple[int, int,
     return [(day, start, end)]
 
 
+def _scheduled_start(day: date, minute: int, tzinfo: Any) -> datetime:
+    """Resolve a wall-clock schedule start to one real instant.
+
+    A start in a DST gap moves forward to the first valid local minute. An
+    ambiguous start during the autumn fold uses its first occurrence, so a
+    repeated wall-clock time cannot start the same watering window twice.
+    """
+    hour, remainder = divmod(minute, 60)
+    candidate = datetime(day.year, day.month, day.day, hour, remainder, tzinfo=tzinfo)
+    if tzinfo is None:
+        return candidate
+    return min(_valid_local_boundaries(candidate), key=_as_utc)
+
+
+def _window_covers(slot: dict[str, Any], start_day: date, now: datetime) -> bool:
+    start = _scheduled_start(start_day, _minute(slot["start"]), now.tzinfo)
+    start_utc = _as_utc(start)
+    now_utc = _as_utc(now)
+    end_utc = start_utc + timedelta(minutes=slot["duration"])
+    return start_utc <= now_utc < end_utc
+
+
 def active_slot(slots: list[dict[str, Any]], now: datetime, schedule_mode: str | None = None) -> dict[str, Any] | None:
     """The slot whose watering window covers ``now``, or ``None``.
 
     A window that runs past midnight also covers the early minutes of the
     following day, so the previous day's weekday is consulted as well.
     """
-    weekday = now.isoweekday()
-    minute = now.hour * 60 + now.minute
+    today = now.date()
     for slot in slots:
-        start = _minute(slot["start"])
-        if minute < start:
-            # The window that covers this minute started yesterday.
-            if schedule_mode != "interval" and ((weekday - 2) % 7 + 1) not in slot["days"]:
+        for start_day in (today, today - timedelta(days=1)):
+            if schedule_mode != "interval" and start_day.isoweekday() not in slot["days"]:
                 continue
-        elif schedule_mode != "interval" and weekday not in slot["days"]:
-            continue
-        if (minute - start) % 1440 < slot["duration"]:
-            return slot
+            if _window_covers(slot, start_day, now):
+                return slot
     return None
 
 
 def active_program_slot(program: dict[str, Any], now: datetime) -> dict[str, Any] | None:
     """Return the running window while respecting the date its window began."""
     mode = program.get("schedule_mode")
-    if mode != "interval":
-        return active_slot(program["slots"], now, mode) if frequency_allows(program, now) else None
-
-    previous_day = now - timedelta(days=1)
-    current_eligible = frequency_allows(program, now)
-    previous_eligible = frequency_allows(program, previous_day)
-    minute = now.hour * 60 + now.minute
+    today = now.date()
     for slot in program["slots"]:
-        start = _minute(slot["start"])
-        if minute >= start:
-            if not current_eligible:
+        for start_day in (today, today - timedelta(days=1)):
+            if mode != "interval" and start_day.isoweekday() not in slot["days"]:
                 continue
-            elapsed = minute - start
-        else:
-            if not previous_eligible:
+            eligible_date = datetime(
+                start_day.year, start_day.month, start_day.day, tzinfo=now.tzinfo
+            )
+            if not frequency_allows(program, eligible_date):
                 continue
-            elapsed = 1440 - start + minute
-        if elapsed < slot["duration"]:
-            return slot
+            if _window_covers(slot, start_day, now):
+                return slot
     return None
 
 
@@ -430,13 +440,12 @@ def next_boundary(
             if schedule_mode == "interval" or weekday in slot["days"]:
                 start = _minute(slot["start"])
                 start_boundary = day + timedelta(minutes=start)
-                resolved_starts = _valid_local_boundaries(start_boundary)
-                shifted_start = any(
-                    boundary.replace(tzinfo=None) != start_boundary.replace(tzinfo=None)
-                    for boundary in resolved_starts
-                )
-                add_candidates(resolved_starts, shifted_start=shifted_start)
-                add_candidates(_valid_local_boundaries(day + timedelta(minutes=start + slot["duration"])))
+                resolved_start = _scheduled_start(day.date(), start, now.tzinfo)
+                shifted_start = resolved_start.replace(tzinfo=None) != start_boundary.replace(tzinfo=None)
+                add_candidates([resolved_start], shifted_start=shifted_start)
+                end_utc = _as_utc(resolved_start) + timedelta(minutes=slot["duration"])
+                end_boundary = end_utc.astimezone(now.tzinfo) if now.tzinfo else end_utc.replace(tzinfo=None)
+                add_candidates([end_boundary])
     now_utc = _as_utc(now)
     future = sorted(
         (entry for utc_candidate, entry in candidates.items() if utc_candidate > now_utc),

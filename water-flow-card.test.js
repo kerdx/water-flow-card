@@ -11,7 +11,7 @@ import {
   normalizeLayout, normalizeCardAction, normalizeHapticStyle, normalizeAnimationDuration,
   CARD_SURFACES, CARD_ACTIONS, HAPTIC_STYLES, ANIMATION_DURATION_DEFAULT, MAX_SLOTS, MAX_DURATION_MINUTES,
   MAX_FREQUENCY_DAYS, WATER_FLOW_DOMAIN, numeric, formatNumber, formatDuration, chipValue, sessionMinutes,
-   pumpStateLabel, workStateLabel, deviceStatusLabel, cardTitle, frequencyAllows, activeSlotFor, activeProgram, nextWindowMs, timeMinutes, timestampClock, stepScheduleValue,
+   pumpStateLabel, workStateLabel, deviceStatusLabel, cardTitle, frequencyAllows, activeSlotFor, activeProgram, nextWindowMs, timeMinutes, timestampClock, localDateString, stepScheduleValue,
   programSensor, programOf, discoverSensorEntity, scheduleDraft, emptyScheduleDraft, validateScheduleDraft, programPayload,
   deleteProgramPayload, actionCall, toggleAutoCall, hapticPattern, fireHaptic,
 } from './custom_components/water_flow_scheduler/www/water-flow-card.js';
@@ -327,6 +327,38 @@ test('frequency rhythm follows the anchor date', () => {
   assert.equal(frequencyAllows({ frequency_days: 2 }, anchor), false);
   assert.equal(frequencyAllows({ frequency_days: 2, start_date: 'not-a-date' }, anchor), false);
   assert.equal(frequencyAllows(null, anchor), true);
+});
+
+test('schedule date and clock formatting use the Home Assistant timezone', () => {
+  const instant = new Date('2026-03-29T23:30:00.000Z');
+  assert.equal(localDateString(instant, 'Europe/Rome'), '2026-03-30');
+  assert.equal(timestampClock('2026-06-01T04:30:00.000Z', 'en-GB', 'Europe/Rome'), '06:30');
+});
+
+test('card schedule status and next time come from the backend in its timezone', () => {
+  const storedSensor = states['sensor.water_flow_scheduler_programs'];
+  const storedProgram = storedSensor.attributes.programs['switch.irrigazione'];
+  const program = {
+    ...storedProgram,
+    active_slot_id: 'morning',
+    next_change: '2026-06-01T04:30:00.000Z',
+    frequency_ok: true,
+  };
+  const card = configuredCard({ ...defaultCardConfig('switch.irrigazione'), language: 'en' });
+  card._hass = fakeHass({
+    config: { time_zone: 'Europe/Rome' },
+    locale: { language: 'en-US' },
+    states: {
+      ...states,
+      'sensor.water_flow_scheduler_programs': {
+        ...storedSensor,
+        attributes: { ...storedSensor.attributes, programs: { 'switch.irrigazione': program } },
+      },
+    },
+  });
+  const html = card._cardMarkup();
+  assert.match(html, /Next: 06:30/);
+  assert.match(html, /Windows: Window 1/);
 });
 
 test('interval mode ignores weekdays and lets eligible windows finish after midnight', () => {
@@ -723,6 +755,8 @@ test('schedule duration and liters use visible, localized accessible steppers', 
   card._hass = fakeHass();
   card._draft = scheduleDraft({ slots: [{ id: 'morning', days: [1], start: '05:30', duration: 30, liters: '120' }] });
   const english = card._slotMarkup(card._draft.slots[0], 0, cardStrings('en'));
+  assert.match(english, /class="days" role="group"[^]*data-act="toggle-day"[^]*aria-pressed="true"/);
+  assert.doesNotMatch(cardSource(), /week-overview|focus-day|_focusScheduleDay/);
   assert.match(english, /data-slot-field="duration" data-direction="1" aria-label="Increase Duration \(minutes\) for window 1"/);
   assert.match(english, /data-slot-field="liters" data-direction="-1" aria-label="Decrease Liters for window 1"/);
   assert.match(english, /aria-controls="wf-slot-0-duration"/);
@@ -730,6 +764,41 @@ test('schedule duration and liters use visible, localized accessible steppers', 
   const italian = card._slotMarkup(card._draft.slots[0], 0, cardStrings('it'));
   assert.match(italian, /Aumenta Durata \(minuti\) per la fascia 1/);
   assert.match(italian, /Riduci Litri per la fascia 1/);
+});
+
+test('anchor date input stays synchronized when frequency clears its draft value', () => {
+  const card = configuredCard(defaultCardConfig('switch.irrigazione'));
+  card._draft = scheduleDraft({
+    enabled: false,
+    schedule_mode: 'interval',
+    frequency_days: 2,
+    start_date: '2026-06-01',
+    slots: [],
+  });
+  const anchor = { value: '2026-06-01' };
+  card._dialog = { querySelector: (selector) => selector === '[data-field="start_date"]' ? anchor : null };
+  card._clearDialogValidation = () => {};
+  card._renderDialogState = () => {};
+
+  const frequency = { dataset: { field: 'frequency_days' }, value: '1' };
+  card._dialogInput(frequency);
+  assert.equal(card._draft.start_date, '');
+  assert.equal(anchor.value, '');
+  frequency.value = '2';
+  card._dialogInput(frequency);
+  assert.equal(card._draft.start_date, '');
+  assert.equal(anchor.value, '');
+  assert.equal(validateScheduleDraft(card._draft).code, 'frequency_needs_anchor');
+});
+
+test('closing the schedule dialog immediately refreshes the card from current hass state', () => {
+  const card = configuredCard(defaultCardConfig('switch.irrigazione'));
+  let refreshes = 0;
+  card._lastRenderKey = 'stale';
+  card._renderIfChanged = () => { refreshes += 1; };
+  card._onDialogClose();
+  assert.equal(card._lastRenderKey, null);
+  assert.equal(refreshes, 1);
 });
 
 test('card keyboard action is isolated from sibling schedule controls', () => {

@@ -111,12 +111,9 @@ const STRINGS = {
     litersHelp: 'Optional target shown by the card.',
     increaseValue: (field, index) => `Increase ${field} for window ${index}`,
     decreaseValue: (field, index) => `Decrease ${field} for window ${index}`,
-    weekOverview: 'Weekly overview',
-    noWateringDay: 'No watering',
     windowCount: (count) => `${count} ${count === 1 ? 'window' : 'windows'}`,
     windowCountLimit: (count, max) => `${count} / ${max} windows`,
     windowSectionHelp: 'Choose when and how long each watering run lasts.',
-    weekdayDetails: (day, times) => times.length ? `${day}: ${times.join(', ')}` : `${day}: no watering scheduled`,
     selectWindowDays: (index) => `Watering days for window ${index}`,
     emptyWindowsTitle: 'No watering windows yet',
     emptyWindowsHelp: 'Add a window, then choose the days and time for watering.',
@@ -337,12 +334,9 @@ const STRINGS = {
     litersHelp: 'Obiettivo facoltativo mostrato dalla card.',
     increaseValue: (field, index) => `Aumenta ${field} per la fascia ${index}`,
     decreaseValue: (field, index) => `Riduci ${field} per la fascia ${index}`,
-    weekOverview: 'Riepilogo settimanale',
-    noWateringDay: 'Nessuna irrigazione',
     windowCount: (count) => `${count} ${count === 1 ? 'fascia' : 'fasce'}`,
     windowCountLimit: (count, max) => `${count} / ${max} fasce`,
     windowSectionHelp: 'Scegli quando e per quanto tempo irrigare.',
-    weekdayDetails: (day, times) => times.length ? `${day}: ${times.join(', ')}` : `${day}: nessuna irrigazione programmata`,
     selectWindowDays: (index) => `Giorni di irrigazione della fascia ${index}`,
     emptyWindowsTitle: 'Nessuna fascia impostata',
     emptyWindowsHelp: 'Aggiungi una fascia e scegli i giorni e l’orario di irrigazione.',
@@ -557,13 +551,17 @@ export const chipValue = (state, locale) => {
   return unit ? `${number} ${unit}` : number;
 };
 
-export const timestampClock = (value, locale) => {
-  const timestamp = numeric(value);
-  if (timestamp === null || timestamp <= 0) return null;
+export const timestampClock = (value, locale, timeZone) => {
+  const number = numeric(value);
+  const timestamp = number === null && typeof value === 'string' ? Date.parse(value) : number;
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return null;
   const date = new Date(timestamp > 1e12 ? timestamp : timestamp * 1000);
   if (!Number.isFinite(date.getTime())) return null;
   try {
-    return new Intl.DateTimeFormat(locale || 'en', { hour: '2-digit', minute: '2-digit' }).format(date);
+    return new Intl.DateTimeFormat(locale || 'en', {
+      hour: '2-digit', minute: '2-digit',
+      ...(timeZone ? { timeZone } : {}),
+    }).format(date);
   } catch {
     return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
   }
@@ -708,7 +706,49 @@ export const isValidDate = (value) => {
   return parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day;
 };
 
-export const localDateString = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+export const localDateString = (date = new Date(), timeZone) => {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      ...(timeZone ? { timeZone } : {}),
+    }).formatToParts(date);
+    const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  } catch {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
+};
+
+const scheduleClock = (timestamp, timeZone) => {
+  const date = new Date(timestamp);
+  if (!Number.isFinite(date.getTime())) return null;
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+      ...(timeZone ? { timeZone } : {}),
+    }).format(date);
+  } catch {
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  }
+};
+
+const scheduleStatus = (program) => {
+  if (!program) {
+    return { enabled: false, running: false, slot: null, slotId: null, frequencyOk: false, nextChangeMs: null };
+  }
+  const slot = program.enabled === false || !Array.isArray(program.slots)
+    ? null
+    : program.slots.find((candidate) => candidate.id === program.active_slot_id) || null;
+  const nextChange = typeof program.next_change === 'string' ? Date.parse(program.next_change) : NaN;
+  return {
+    enabled: program.enabled !== false,
+    running: Boolean(slot),
+    slot,
+    slotId: slot?.id ?? null,
+    frequencyOk: Boolean(program.frequency_ok || slot),
+    nextChangeMs: Number.isFinite(nextChange) ? nextChange : null,
+  };
+};
 
 const gcd = (a, b) => (b ? gcd(b, a % b) : a);
 
@@ -1160,15 +1200,6 @@ const CARD_CSS = `
   .status-pill{flex:0 0 auto;border-radius:999px;padding:6px 10px;background:var(--secondary-background-color);color:var(--secondary-text-color);font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
   .status-pill[data-enabled="true"]{background:color-mix(in srgb, var(--success-color,#2e7d32) 15%, transparent);color:var(--success-color,#2e7d32)}
   .dlg-body{padding:0 22px 18px;display:flex;flex-direction:column;gap:18px;min-height:0;flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain}
-  .week-overview-wrap{display:flex;flex-direction:column;gap:8px}
-  .week-overview-title{font-size:12px;font-weight:700;color:var(--secondary-text-color);letter-spacing:.04em;text-transform:uppercase}
-  .week-overview{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
-  .week-day{min-width:0;min-height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 2px;border:1px solid var(--divider-color);border-radius:12px;background:var(--secondary-background-color);color:var(--secondary-text-color);font:inherit;cursor:pointer}
-  .week-day strong{font-size:12px;color:var(--primary-text-color)}
-  .week-day small{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px}
-  .week-day[data-scheduled="true"]{border-color:color-mix(in srgb, var(--water-flow-accent-color) 50%, var(--divider-color));background:color-mix(in srgb, var(--water-flow-accent-color) 12%, var(--secondary-background-color));color:var(--water-flow-accent-color)}
-  .week-day[data-today="true"] strong{color:var(--water-flow-accent-color)}
-  .week-day:disabled{cursor:default;opacity:.7}
   .dlg-section{display:flex;flex-direction:column;gap:10px;scroll-margin:10px}
   .dlg-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
   .dlg-section-head h3{margin:0;font-size:16px;font-weight:650}
@@ -1212,7 +1243,7 @@ const CARD_CSS = `
   .days{display:flex;gap:4px}
   .day{flex:1 1 0;border:1px solid var(--divider-color);background:var(--card-background-color,var(--ha-card-background));color:var(--secondary-text-color);border-radius:9px;padding:8px 0;font:inherit;font-size:12px;font-weight:650;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
   .day[aria-pressed="true"]{background:var(--water-flow-accent-color);border-color:var(--water-flow-accent-color);color:var(--text-primary-color,#fff)}
-  .day:focus-visible,.week-day:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
+  .day:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
   .slot-grid{display:flex;gap:8px;flex-wrap:wrap}
   .slot-grid label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--secondary-text-color)}
   .number-control{display:inline-flex;align-items:stretch;height:40px}
@@ -1246,7 +1277,7 @@ const CARD_CSS = `
   .btn.danger{color:var(--error-color);border-color:color-mix(in srgb, var(--error-color) 45%, transparent);background:transparent}
   .btn:focus-visible,.slot-remove:focus-visible,.close:focus-visible,.add:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
   ha-entity-picker{flex:1 1 190px;max-width:280px;min-width:0}
-  @media(max-width:520px){dialog{max-width:calc(100vw - 16px);border-radius:18px}.dlg-head{padding:16px 16px 10px}.dlg-summary{margin:0 16px 12px;padding:12px}.dlg-body{padding:0 16px 14px;gap:14px}.dlg-foot{padding:10px 16px max(12px,env(safe-area-inset-bottom))}.week-overview{gap:4px}.week-day{min-height:52px}.week-day small{font-size:8px}.mode-grid{grid-template-columns:1fr}.mode-card{min-height:68px}.slot-grid label{flex:1 1 110px}.dlg-actions{align-items:stretch}.dlg-actions-right{margin-left:auto}}
+  @media(max-width:520px){dialog{max-width:calc(100vw - 16px);border-radius:18px}.dlg-head{padding:16px 16px 10px}.dlg-summary{margin:0 16px 12px;padding:12px}.dlg-body{padding:0 16px 14px;gap:14px}.dlg-foot{padding:10px 16px max(12px,env(safe-area-inset-bottom))}.mode-grid{grid-template-columns:1fr}.mode-card{min-height:68px}.slot-grid label{flex:1 1 110px}.dlg-actions{align-items:stretch}.dlg-actions-right{margin-left:auto}}
   @media(prefers-reduced-motion:reduce){.day,.btn,.add{transition:none}.btn:not(:disabled):hover{transform:none}}
   .preview{pointer-events:none}
 `;
@@ -1499,6 +1530,7 @@ export class WaterFlowCard extends HTMLElementBase {
       state?.state,
       state?.attributes?.friendly_name,
       this._hass?.locale?.language ?? this._hass?.language ?? null,
+      this._hass?.config?.time_zone ?? null,
       auto?.state,
       readoutStates,
       workStateEntity ? [workStateEntity, workState?.state] : null,
@@ -1577,13 +1609,14 @@ export class WaterFlowCard extends HTMLElementBase {
     const shortageProtection = shortageProtectionEntity ? this._hass?.states?.[shortageProtectionEntity] : null;
     const status = state?.state;
     const unavailable = status === 'unavailable' || status === 'unknown';
-    const statusView = activeProgram(program, Date.now());
+    const statusView = scheduleStatus(program);
     const running = status === 'on';
     const scheduleEnabled = program?.enabled === true;
     const accent = normalizeAccentColor(config.accent_color);
     const surface = normalizeSurface(config.surface);
     const layout = normalizeLayout(config.layout);
     const locale = cardLanguage(config, this._hass) === 'it' ? 'it-IT' : 'en-US';
+    const timeZone = this._hass?.config?.time_zone;
     const chips = [];
     const stateLabel = unavailable ? strings.unavailable : pumpStateLabel(status, strings);
     const batteryReading = chipValue(batteryState, locale);
@@ -1640,16 +1673,16 @@ export class WaterFlowCard extends HTMLElementBase {
       if (value !== null) chips.push(`<span class="real-time-duration-chip">${esc(strings.realTimeDuration)} · ${esc(value)}</span>`);
     }
     if (config.show_irrigation_time_chips !== false && startTimeEntity) {
-      const value = timestampClock(startTimeState?.state, locale) || strings.unavailable;
+      const value = timestampClock(startTimeState?.state, locale, timeZone) || strings.unavailable;
       chips.push(`<span class="irrigation-start-chip">${esc(strings.irrigationStart)} · ${esc(value)}</span>`);
     }
     if (config.show_irrigation_time_chips !== false && endTimeEntity) {
-      const value = timestampClock(endTimeState?.state, locale) || strings.unavailable;
+      const value = timestampClock(endTimeState?.state, locale, timeZone) || strings.unavailable;
       chips.push(`<span class="irrigation-end-chip">${esc(strings.irrigationEnd)} · ${esc(value)}</span>`);
     }
     if (config.show_next_change_chip !== false && program) {
-      const next = statusView.nextChangeMs ? new Date(statusView.nextChangeMs) : null;
-      chips.push(`<span>${esc(strings.nextWindow + (next ? `${String(next.getHours()).padStart(2, '0')}:${String(next.getMinutes()).padStart(2, '0')}` : strings.none))}</span>`);
+      const next = statusView.nextChangeMs ? scheduleClock(statusView.nextChangeMs, timeZone) : null;
+      chips.push(`<span>${esc(strings.nextWindow + (next || strings.none))}</span>`);
     }
     const error = this._cardServiceError || (program?.last_error ? errorLabel(program.last_error, strings) : '');
     const title = esc(cardTitle(config, this._hass));
@@ -1663,7 +1696,7 @@ export class WaterFlowCard extends HTMLElementBase {
     const windowLabel = activeWindowIndex >= 0
       ? strings.window(activeWindowIndex + 1)
       : program && statusView.nextChangeMs
-        ? (() => { const next = new Date(statusView.nextChangeMs); return `${String(next.getHours()).padStart(2, '0')}:${String(next.getMinutes()).padStart(2, '0')}`; })()
+        ? scheduleClock(statusView.nextChangeMs, timeZone)
         : strings.none;
     const subRow = [];
     if (config.show_shortage_protection_button !== false && shortageProtectionEntity) {
@@ -1904,10 +1937,6 @@ export class WaterFlowCard extends HTMLElementBase {
               <ha-entity-picker id="wf-auto" data-field="auto_entity" aria-describedby="wf-auto-help"></ha-entity-picker>
             </div>
           </section>
-          <div class="week-overview-wrap" data-role="weekly-overview-wrap" ${mode === 'interval' ? 'hidden' : ''}>
-            <div class="week-overview-title">${esc(strings.weekOverview)}</div>
-            <div data-role="weekly-overview">${this._weeklyOverviewMarkup(strings)}</div>
-          </div>
           <section class="dlg-section" id="wf-windows" tabindex="-1" aria-labelledby="wf-windows-title">
             <div class="dlg-section-head">
               <div><h3 id="wf-windows-title">${esc(strings.windowsAria)}</h3><p data-role="window-help">${esc(windowHelpForMode(mode, strings))}</p></div>
@@ -1943,18 +1972,6 @@ export class WaterFlowCard extends HTMLElementBase {
     this._errorBox = dialog.querySelector('.dlg-error');
     this._bindAutoPicker();
     this._renderDialogState();
-  }
-
-  _weeklyOverviewMarkup(strings = this._strings()) {
-    const draft = this._draft || emptyScheduleDraft();
-    const today = new Date().getDay() || 7;
-    return `<div class="week-overview" role="group" aria-label="${esc(strings.weekOverview)}">${strings.dayPills.map((label, index) => {
-      const day = index + 1;
-      const windows = draft.slots.filter((slot) => slot.days.includes(day)).sort((a, b) => (timeMinutes(a.start) ?? 0) - (timeMinutes(b.start) ?? 0));
-      const times = windows.map((slot) => `${slot.start} · ${formatDuration(slot.duration, strings)}`);
-      const details = strings.weekdayDetails(strings.dayNames[index], times);
-      return `<button class="week-day" type="button" data-act="focus-day" data-day="${day}" data-scheduled="${windows.length > 0}" data-today="${day === today}" aria-label="${esc(details)}" title="${esc(details)}" ${windows.length ? '' : 'disabled'}><strong>${esc(label)}</strong><small>${esc(windows.length ? windows.map((slot) => slot.start).join(', ') : '—')}</small></button>`;
-    }).join('')}</div>`;
   }
 
   _bindAutoPicker() {
@@ -2006,8 +2023,9 @@ export class WaterFlowCard extends HTMLElementBase {
       if (!Number.isInteger(slotIndex) || !draft.slots[slotIndex] || !slotField) return;
       draft.slots[slotIndex][slotField] = slotField === 'duration' && target.value !== '' ? Number(target.value) : target.value;
     }
+    const anchorInput = this._dialog?.querySelector('[data-field="start_date"]');
+    if (anchorInput && anchorInput.value !== (draft.start_date || '')) anchorInput.value = draft.start_date || '';
     this._clearDialogValidation();
-    this._refreshWeeklyOverview();
     this._renderDialogState();
   }
 
@@ -2065,11 +2083,9 @@ export class WaterFlowCard extends HTMLElementBase {
       draft.slots[index].days = days.includes(day) ? days.filter((value) => value !== day) : [...days, day].sort((a, b) => a - b);
       target.setAttribute('aria-pressed', String(draft.slots[index].days.includes(day)));
       this._clearDialogValidation();
-      this._refreshWeeklyOverview();
       this._renderDialogState();
       return;
     }
-    if (action === 'focus-day') { this._focusScheduleDay(Number(target.dataset.day)); return; }
     if (action === 'delete') {
       this._confirmDelete = true;
       this._confirmDiscard = false;
@@ -2088,10 +2104,9 @@ export class WaterFlowCard extends HTMLElementBase {
       draft.frequency_days = 1;
       draft.start_date = '';
     } else {
-      if (!isValidDate(draft.start_date)) draft.start_date = localDateString();
+      if (!isValidDate(draft.start_date)) draft.start_date = localDateString(new Date(), this._hass?.config?.time_zone);
     }
     this._clearDialogValidation();
-    this._refreshWeeklyOverview();
     this._renderDialogState();
   }
 
@@ -2099,7 +2114,6 @@ export class WaterFlowCard extends HTMLElementBase {
     const container = this._dialog?.querySelector('.slots');
     if (!container) return;
     container.innerHTML = this._draft.slots.map((slot, index) => this._slotMarkup(slot, index, this._strings())).join('');
-    this._refreshWeeklyOverview();
     this._renderDialogState();
     if (focusIndex !== null && focusIndex >= 0) {
       const focusTarget = this._draft.schedule_mode === 'interval'
@@ -2112,11 +2126,6 @@ export class WaterFlowCard extends HTMLElementBase {
     }
   }
 
-  _refreshWeeklyOverview() {
-    const overview = this._dialog?.querySelector('[data-role="weekly-overview"]');
-    if (overview) overview.innerHTML = this._weeklyOverviewMarkup();
-  }
-
   _focusScheduleSection(focus = 'slots') {
     const target = focus === 'frequency'
       ? this._dialog?.querySelector(this._draft?.schedule_mode === 'weekdays' ? '[data-act="set-mode"][data-mode="interval"]' : '[data-field="frequency_days"]')
@@ -2125,14 +2134,6 @@ export class WaterFlowCard extends HTMLElementBase {
     target.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
     target.focus?.({ preventScroll: true });
     if (focus === 'frequency') target.select?.();
-  }
-
-  _focusScheduleDay(day) {
-    const index = this._draft?.slots?.findIndex((slot) => slot.days.includes(day)) ?? -1;
-    if (index < 0) return;
-    const target = this._dialog?.querySelector(`.slot[data-slot="${index}"] .day[data-day="${day}"]`);
-    target?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
-    target?.focus?.();
   }
 
   _isScheduleDraftDirty() {
@@ -2150,9 +2151,9 @@ export class WaterFlowCard extends HTMLElementBase {
     const status = dialog.querySelector('[data-role="program-status"]');
     const windowCount = dialog.querySelector('[data-role="window-count"]');
     const anchorRow = dialog.querySelector('[data-role="anchor-row"]');
+    const anchorInput = dialog.querySelector('[data-field="start_date"]');
     const frequencyRow = dialog.querySelector('[data-role="frequency-row"]');
     const frequencyHelp = dialog.querySelector('[data-role="frequency-help"]');
-    const overviewWrap = dialog.querySelector('[data-role="weekly-overview-wrap"]');
     const windowHelp = dialog.querySelector('[data-role="window-help"]');
     const empty = dialog.querySelector('[data-role="empty-windows"]');
     const add = dialog.querySelector('[data-act="add-slot"]');
@@ -2164,10 +2165,10 @@ export class WaterFlowCard extends HTMLElementBase {
       status.dataset.enabled = String(draft.enabled);
     }
     if (windowCount) windowCount.textContent = strings.windowCountLimit(draft.slots.length, MAX_SLOTS);
+    if (anchorInput && anchorInput.value !== (draft.start_date || '')) anchorInput.value = draft.start_date || '';
     if (frequencyRow) frequencyRow.hidden = draft.schedule_mode === 'weekdays';
     if (frequencyHelp) frequencyHelp.textContent = frequencyHelpForMode(draft.schedule_mode, strings);
     if (anchorRow) anchorRow.hidden = draft.schedule_mode === 'weekdays' || !(Number(draft.frequency_days) > 1);
-    if (overviewWrap) overviewWrap.hidden = draft.schedule_mode === 'interval';
     if (windowHelp) windowHelp.textContent = windowHelpForMode(draft.schedule_mode, strings);
     for (const button of dialog.querySelectorAll('[data-act="set-mode"]')) {
       const selected = button.dataset.mode === draft.schedule_mode;
@@ -2353,6 +2354,7 @@ export class WaterFlowCard extends HTMLElementBase {
   }
 
   _onDialogClose() {
+    const focus = this._scheduleOpener?.dataset?.focus;
     this._lastRenderKey = null;
     this._draft = null;
     this._scheduleSnapshot = null;
@@ -2362,7 +2364,11 @@ export class WaterFlowCard extends HTMLElementBase {
     this._busyAction = null;
     this._confirmDelete = false;
     this._confirmDiscard = false;
-    this._scheduleOpener?.focus?.();
+    this._renderIfChanged();
+    const opener = focus
+      ? this.shadowRoot?.querySelector?.(`[data-act="schedule"][data-focus="${focus}"]`)
+      : this.shadowRoot?.querySelector?.('[data-act="schedule"]');
+    opener?.focus?.();
     this._scheduleOpener = null;
   }
 }
