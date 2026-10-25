@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.1.0
+
+- Add the integration brand icon and repository metadata for HACS validation.
+- Streamline the README with concise installation, card configuration, and scheduler guidance.
+
 ## v1.0.0
 
 - First release: the `water_flow_scheduler` integration and `custom:water-flow-card`, mirroring the structure of Climate Flow Card.
