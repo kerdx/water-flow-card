@@ -1,0 +1,72 @@
+save_program:
+  name: Save program
+  description: Create or replace the weekly irrigation program for one switch entity.
+  fields:
+    water_entity:
+      name: Pump switch
+      description: Switch entity that powers the irrigation pump or valve.
+      required: true
+      selector:
+        entity:
+          domain: switch
+    enabled:
+      name: Enabled
+      description: Whether the saved program is enabled.
+      required: true
+      selector:
+        boolean:
+    slots:
+      name: Watering windows
+      description: Weekly windows. Each window requires id, days (1 Monday to 7 Sunday), start (HH:MM) and duration in minutes; liters is optional and only shown by the card.
+      required: true
+      example: '[{"id":"morning","days":[1,2,3,4,5],"start":"05:30","duration":30,"liters":120}]'
+    frequency_days:
+      name: Frequency
+      description: Water every N days, counted from start_date. 1 waters on every scheduled day.
+      required: false
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 31
+          mode: box
+    start_date:
+      name: Frequency anchor date
+      description: First day of the every-N-days rhythm, as YYYY-MM-DD. Required when frequency_days is greater than 1.
+      required: false
+      example: "2026-05-01"
+    auto_entity:
+      name: Auto helper
+      description: Optional input_boolean that hands the pump to this scheduler while it is on; while it is off the scheduler never touches the switch.
+      required: false
+      selector:
+        entity:
+          domain: input_boolean
+set_enabled:
+  name: Set program enabled
+  description: Enable or disable the saved program for one switch entity.
+  fields:
+    water_entity:
+      name: Pump switch
+      description: Switch entity whose program to update.
+      required: true
+      selector:
+        entity:
+          domain: switch
+    enabled:
+      name: Enabled
+      description: Whether the program is enabled.
+      required: true
+      selector:
+        boolean:
+delete_program:
+  name: Delete program
+  description: Delete the saved program for one switch entity.
+  fields:
+    water_entity:
+      name: Pump switch
+      description: Switch entity whose program to delete.
+      required: true
+      selector:
+        entity:
+          domain: switch

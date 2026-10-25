@@ -1,0 +1,19 @@
+{
+  "domain": "water_flow_scheduler",
+  "name": "Water Flow Scheduler",
+  "codeowners": [
+    "@kerdx"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "frontend",
+    "http"
+  ],
+  "documentation": "https://github.com/kerdx/water-flow-card",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/kerdx/water-flow-card/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "1.0.0"
+}

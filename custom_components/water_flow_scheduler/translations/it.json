@@ -1,0 +1,90 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Water Flow Scheduler",
+        "description": "Aggiunge il pianificatore irrigazione; i programmi si configurano con i suoi servizi."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "È consentita una sola istanza."
+    }
+  },
+  "exceptions": {
+    "invalid_program": {
+      "message": "Il programma di irrigazione non è valido: {message}"
+    },
+    "invalid_time": {
+      "message": "Gli orari devono usare il formato HH:MM su 24 ore."
+    },
+    "invalid_duration": {
+      "message": "duration deve essere un numero intero di minuti tra 1 e {max}."
+    },
+    "invalid_liters": {
+      "message": "liters deve essere un numero finito maggiore di zero."
+    },
+    "invalid_frequency": {
+      "message": "frequency_days deve essere un numero intero tra 1 e {max}."
+    },
+    "invalid_start_date": {
+      "message": "start_date deve usare il formato AAAA-MM-GG."
+    },
+    "frequency_needs_anchor": {
+      "message": "Una frequenza maggiore di un giorno richiede una data di partenza (start_date)."
+    },
+    "invalid_auto_entity": {
+      "message": "auto_entity deve essere un'entità input_boolean."
+    },
+    "entity_validation_failed": {
+      "message": "L'entità non accetta questo programma: {message}"
+    },
+    "no_program": {
+      "message": "Non esiste nessun programma per questa entità switch."
+    },
+    "invalid_enabled": {
+      "message": "enabled deve essere booleano."
+    },
+    "invalid_slots": {
+      "message": "slots deve essere una lista."
+    },
+    "too_many_slots": {
+      "message": "Un programma può contenere al massimo {max} finestre."
+    },
+    "empty_enabled_program": {
+      "message": "Un programma attivo richiede almeno una finestra."
+    },
+    "invalid_slot_schema": {
+      "message": "Ogni finestra richiede id, days, start, duration e facoltativamente liters."
+    },
+    "invalid_slot_id": {
+      "message": "L'id della finestra deve iniziare con un carattere alfanumerico e usare lettere, cifre, punti, trattini o underscore."
+    },
+    "duplicate_slot_id": {
+      "message": "Id finestra duplicato: {id}."
+    },
+    "invalid_days": {
+      "message": "days deve essere una lista non vuota di giorni ISO da 1 a 7."
+    },
+    "duplicate_days": {
+      "message": "days non può contenere duplicati."
+    },
+    "slots_overlap": {
+      "message": "Le finestre {a} e {b} si sovrappongono."
+    },
+    "unknown_water_entity": {
+      "message": "Entità switch sconosciuta: {entity}."
+    },
+    "unknown_auto_entity": {
+      "message": "Entità auto sconosciuta: {entity}."
+    },
+    "entity_unavailable": {
+      "message": "L'entità switch non è disponibile; il comando alla pompa è in attesa."
+    },
+    "service_call_failed": {
+      "message": "La chiamata al servizio switch non è riuscita: {message}"
+    },
+    "unexpected_failure": {
+      "message": "Errore del pianificatore: {message}"
+    }
+  }
+}
