@@ -791,6 +791,85 @@ test('anchor date input stays synchronized when frequency clears its draft value
   assert.equal(validateScheduleDraft(card._draft).code, 'frequency_needs_anchor');
 });
 
+test('frequency stepper clamps to 1–31 days and localizes unit and accessible labels', () => {
+  const card = configuredCard(defaultCardConfig('switch.irrigazione'));
+  card._hass = fakeHass();
+  card._draft = scheduleDraft({ schedule_mode: 'interval', frequency_days: 1, start_date: '2026-06-01', slots: [] });
+  const frequency = { dataset: { field: 'frequency_days' }, value: '1', focus() {} };
+  card._dialog = { querySelector: (selector) => selector === '[data-field="frequency_days"]' ? frequency : null };
+  card._clearDialogValidation = () => {};
+  card._renderDialogState = () => {};
+
+  card._dialogAction('step-frequency', { dataset: { direction: '-1' } });
+  assert.equal(card._draft.frequency_days, 1);
+  card._dialogAction('step-frequency', { dataset: { direction: '1' } });
+  assert.equal(card._draft.frequency_days, 2);
+  card._draft.frequency_days = MAX_FREQUENCY_DAYS;
+  frequency.value = String(MAX_FREQUENCY_DAYS);
+  card._dialogAction('step-frequency', { dataset: { direction: '1' } });
+  assert.equal(card._draft.frequency_days, MAX_FREQUENCY_DAYS);
+
+  assert.equal(cardStrings('en').frequencyUnit(1), 'day');
+  assert.equal(cardStrings('en').frequencyUnit(2), 'days');
+  assert.equal(cardStrings('it').frequencyUnit(1), 'giorno');
+  assert.equal(cardStrings('it').frequencyUnit(2), 'giorni');
+  assert.equal(cardStrings('en').increaseFrequency, 'Increase interval by one day');
+  assert.equal(cardStrings('it').decreaseFrequency, 'Riduci l’intervallo di un giorno');
+  assert.equal(cardStrings('en').pumpSelectorLabel, 'Pump connection');
+  assert.equal(cardStrings('it').pumpSelectorLabel, 'Collegamento pompa');
+});
+
+test('schedule dialog renders the localized bounded frequency stepper', () => {
+  const config = { ...defaultCardConfig('switch.irrigazione'), language: 'it' };
+  const card = configuredCard(config);
+  card._hass = fakeHass();
+  card._draft = scheduleDraft({ schedule_mode: 'interval', frequency_days: 2, start_date: '2026-06-01', slots: [] });
+  card._renderDialogState = () => {};
+  card._dialog = {
+    setAttribute() {},
+    querySelector: () => null,
+  };
+
+  card._fillDialog();
+
+  assert.match(card._dialog.innerHTML, /class="frequency-control"/);
+  assert.match(card._dialog.innerHTML, /data-act="step-frequency" data-direction="-1" aria-label="Riduci l’intervallo di un giorno"/);
+  assert.match(card._dialog.innerHTML, /data-act="step-frequency" data-direction="1" aria-label="Aumenta l’intervallo di un giorno"/);
+  assert.match(card._dialog.innerHTML, /id="wf-frequency" type="number" min="1" max="31" step="1"/);
+  assert.match(card._dialog.innerHTML, /class="frequency-unit" data-role="frequency-unit">giorni/);
+});
+
+test('frequency unit and stepper disabled states follow the selected bounds', () => {
+  const card = configuredCard({ ...defaultCardConfig('switch.irrigazione'), language: 'it' });
+  card._hass = fakeHass();
+  card._draft = scheduleDraft({ schedule_mode: 'interval', frequency_days: 1, start_date: '2026-06-01', slots: [] });
+  card._isScheduleDraftDirty = () => false;
+  const unit = { textContent: '' };
+  const decrease = { disabled: false };
+  const increase = { disabled: false };
+  const controls = new Map([
+    ['[data-role="frequency-unit"]', unit],
+    ['[data-act="step-frequency"][data-direction="-1"]', decrease],
+    ['[data-act="step-frequency"][data-direction="1"]', increase],
+  ]);
+  card._dialog = {
+    querySelector: (selector) => controls.get(selector) || null,
+    querySelectorAll: () => [],
+    removeAttribute() {},
+  };
+
+  card._renderDialogState();
+  assert.equal(unit.textContent, 'giorno');
+  assert.equal(decrease.disabled, true);
+  assert.equal(increase.disabled, false);
+
+  card._draft.frequency_days = MAX_FREQUENCY_DAYS;
+  card._renderDialogState();
+  assert.equal(unit.textContent, 'giorni');
+  assert.equal(decrease.disabled, false);
+  assert.equal(increase.disabled, true);
+});
+
 test('closing the schedule dialog immediately refreshes the card from current hass state', () => {
   const card = configuredCard(defaultCardConfig('switch.irrigazione'));
   let refreshes = 0;
@@ -987,6 +1066,10 @@ test('editor row markup binds every selector to a localized label', () => {
   const strings = cardStrings('it');
   const row = (name) => editor._rowMarkup(configSchemaFields().find((entry) => entry.name === name), strings);
   assert.match(row('entity'), /ha-entity-picker/);
+  assert.match(row('entity'), /class="pump-picker"/);
+  assert.match(row('entity'), /icon="mdi:water-pump"/);
+  assert.match(row('entity'), /Collegamento pompa/);
+  assert.match(row('entity'), /aria-label="Switch pompa"/);
   assert.match(row('auto_entity'), /data-field="auto_entity"/);
   assert.match(row('show_flow_chip'), /role="switch"/);
   assert.match(row('layout'), /data-value="pill"/);
@@ -998,6 +1081,24 @@ test('editor row markup binds every selector to a localized label', () => {
     assert.ok(markup.includes(fieldLabel(strings, entry.name)) || entry.name === 'entity');
     assert.ok(markup.includes(strings.help[entry.name]));
   }
+});
+
+test('pump entity picker keeps its switch-only domain filter', () => {
+  const pump = configSchemaFields().find((entry) => entry.name === 'entity');
+  assert.deepEqual(pump.selector.entity.filter.domain, ['switch']);
+
+  const editor = new WaterFlowCardEditor();
+  editor._config = defaultCardConfig('switch.irrigazione');
+  editor._hass = fakeHass();
+  editor._pickers = [];
+  const picker = {};
+  editor.shadowRoot = {
+    querySelector: (selector) => selector === '[data-field="entity"]' ? picker : null,
+  };
+  editor._renderValues();
+
+  assert.deepEqual(picker.includeDomains, ['switch']);
+  assert.equal(picker.value, 'switch.irrigazione');
 });
 
 test('editor sends config-changed using the Home Assistant event contract', () => {

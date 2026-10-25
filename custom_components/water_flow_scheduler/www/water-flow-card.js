@@ -76,6 +76,10 @@ const STRINGS = {
     weekdayModeHelp: 'Water on the selected weekdays every week.',
     intervalMode: 'Every N days',
     intervalModeHelp: 'Repeat each watering window on a continuous cycle from a start date.',
+    frequencyUnit: (days) => days === 1 ? 'day' : 'days',
+    increaseFrequency: 'Increase interval by one day',
+    decreaseFrequency: 'Decrease interval by one day',
+    pumpSelectorLabel: 'Pump connection',
     intervalFrequencyHelp: 'Repeat every watering window every N days from the start date.',
     legacyFrequencyHelp: 'The schedule checks your selected weekdays on a repeating N-day cycle.',
     legacyMode: 'Existing combined schedule',
@@ -299,6 +303,10 @@ const STRINGS = {
     weekdayModeHelp: 'Irriga nei giorni selezionati, ogni settimana.',
     intervalMode: 'Ogni N giorni',
     intervalModeHelp: 'Ripete ogni fascia con un ciclo continuo a partire da una data.',
+    frequencyUnit: (days) => days === 1 ? 'giorno' : 'giorni',
+    increaseFrequency: 'Aumenta l’intervallo di un giorno',
+    decreaseFrequency: 'Riduci l’intervallo di un giorno',
+    pumpSelectorLabel: 'Collegamento pompa',
     intervalFrequencyHelp: 'Ripete ogni fascia ogni N giorni a partire dalla data iniziale.',
     legacyFrequencyHelp: 'Il programma verifica i giorni selezionati seguendo un ciclo di N giorni.',
     legacyMode: 'Programma precedente combinato',
@@ -1213,21 +1221,36 @@ const CARD_CSS = `
   .input:focus-visible{outline:2px solid var(--primary-color);outline-offset:1px}
   .input[aria-invalid="true"],ha-entity-picker[aria-invalid="true"]{border-color:var(--error-color)}
   .input.num{width:96px;text-align:right}
+  .frequency-control{display:inline-flex;max-width:100%;align-items:center;gap:4px;padding:4px;border:1px solid color-mix(in srgb,var(--water-flow-accent-color) 32%,var(--divider-color));border-radius:16px;background:linear-gradient(145deg,color-mix(in srgb,var(--water-flow-accent-color) 7%,var(--secondary-background-color)),var(--secondary-background-color));box-shadow:0 4px 14px rgba(0,0,0,.1),inset 0 1px 0 rgba(255,255,255,.08);transition:border-color .18s,box-shadow .18s}
+  .frequency-control:focus-within{border-color:var(--water-flow-accent-color);box-shadow:0 0 0 3px color-mix(in srgb,var(--water-flow-accent-color) 16%,transparent)}
+  .frequency-mark{width:36px;height:36px;flex:0 0 36px;display:grid;place-items:center;border-radius:11px;background:color-mix(in srgb,var(--water-flow-accent-color) 14%,var(--secondary-background-color));color:var(--water-flow-accent-color)}
+  .frequency-mark ha-icon{--mdc-icon-size:19px}
+  .frequency-step{width:44px;height:44px;flex:0 0 44px;display:grid;place-items:center;padding:0;border:1px solid var(--divider-color);border-radius:12px;background:var(--card-background-color,var(--ha-card-background));color:var(--primary-text-color);cursor:pointer;transition:background .16s,border-color .16s,color .16s,transform .12s}
+  .frequency-step ha-icon{--mdc-icon-size:18px}
+  .frequency-step:hover{border-color:var(--water-flow-accent-color);color:var(--water-flow-accent-color)}
+  .frequency-step:disabled{opacity:.42;cursor:not-allowed;transform:none}
+  .frequency-step:active{transform:scale(.94);background:color-mix(in srgb,var(--water-flow-accent-color) 12%,var(--secondary-background-color))}
+  .frequency-step:focus-visible{outline:2px solid var(--primary-color);outline-offset:1px}
+  .frequency-control .input.num{width:54px;height:44px;min-height:44px;padding:0;border:0;background:transparent;color:var(--primary-text-color);font-size:18px;font-weight:750;text-align:center;font-variant-numeric:tabular-nums;-moz-appearance:textfield}
+  .frequency-control input[type="number"]::-webkit-inner-spin-button,.frequency-control input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+  .frequency-unit{min-width:34px;padding:0 4px;color:var(--secondary-text-color);font-size:12px;font-weight:650}
   .field-stack{display:flex;flex-direction:column;gap:12px;padding:14px 0;border-bottom:1px solid var(--divider-color);scroll-margin:10px}
   .mode-picker{display:flex;flex-direction:column;gap:9px}
   .mode-picker-title{font-size:13px;font-weight:650;color:var(--primary-text-color)}
   .mode-grid{display:grid;grid-template-columns:1fr;gap:10px}
-  .mode-card{min-width:0;min-height:68px;display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--divider-color);border-radius:14px;background:var(--secondary-background-color);color:var(--primary-text-color);text-align:left;font:inherit;cursor:pointer;transition:background .18s,border-color .18s,box-shadow .18s,transform .18s}
+  .mode-card{position:relative;min-width:0;min-height:82px;display:flex;align-items:center;gap:12px;overflow:hidden;padding:14px;border:1px solid color-mix(in srgb,var(--water-flow-accent-color) 20%,var(--divider-color));border-radius:16px;background:linear-gradient(145deg,var(--secondary-background-color),color-mix(in srgb,var(--water-flow-accent-color) 4%,var(--secondary-background-color)));box-shadow:0 3px 12px rgba(0,0,0,.08);color:var(--primary-text-color);text-align:left;font:inherit;cursor:pointer;transition:background .18s,border-color .18s,box-shadow .18s,transform .18s}
+  .mode-card:before{content:'';position:absolute;inset:0 auto 0 0;width:3px;background:var(--water-flow-accent-color);opacity:0;transition:opacity .18s}
   .mode-card:hover{border-color:color-mix(in srgb,var(--water-flow-accent-color) 55%,var(--divider-color));transform:translateY(-1px)}
-  .mode-card[data-selected="true"]{border-color:var(--water-flow-accent-color);background:color-mix(in srgb,var(--water-flow-accent-color) 10%,var(--secondary-background-color));box-shadow:inset 0 0 0 1px var(--water-flow-accent-color)}
+  .mode-card[data-selected="true"]{border-color:var(--water-flow-accent-color);background:linear-gradient(135deg,color-mix(in srgb,var(--water-flow-accent-color) 14%,var(--secondary-background-color)),color-mix(in srgb,var(--water-flow-accent-color) 6%,var(--secondary-background-color)));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--water-flow-accent-color) 75%,transparent),0 5px 16px color-mix(in srgb,var(--water-flow-accent-color) 15%,transparent)}
+  .mode-card[data-selected="true"]:before{opacity:1}
   .mode-card:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
-  .mode-icon{--mdc-icon-size:21px;flex:0 0 auto;color:var(--secondary-text-color)}
-  .mode-card[data-selected="true"] .mode-icon{color:var(--water-flow-accent-color)}
+  .mode-icon{width:44px;height:44px;--mdc-icon-size:21px;flex:0 0 44px;display:grid;place-items:center;border-radius:13px;background:color-mix(in srgb,var(--water-flow-accent-color) 9%,var(--card-background-color,var(--ha-card-background)));color:var(--secondary-text-color);transition:background .18s,color .18s,box-shadow .18s}
+  .mode-card[data-selected="true"] .mode-icon{background:var(--water-flow-accent-color);color:var(--text-primary-color,#fff);box-shadow:0 3px 9px color-mix(in srgb,var(--water-flow-accent-color) 32%,transparent)}
   .mode-copy{display:flex;flex:1 1 auto;min-width:0;flex-direction:column;gap:3px}
-  .mode-copy strong{font-size:12px;font-weight:700}
+  .mode-copy strong{font-size:13px;font-weight:700}
   .mode-copy small{font-size:11px;line-height:1.35;color:var(--secondary-text-color)}
-  .mode-check{--mdc-icon-size:18px;flex:0 0 auto;color:var(--water-flow-accent-color);opacity:0}
-  .mode-card[data-selected="true"] .mode-check{opacity:1}
+  .mode-check{width:28px;height:28px;--mdc-icon-size:18px;flex:0 0 28px;display:grid;place-items:center;border-radius:50%;background:color-mix(in srgb,var(--water-flow-accent-color) 12%,transparent);color:var(--water-flow-accent-color);opacity:0;transform:scale(.8);transition:opacity .18s,transform .18s}
+  .mode-card[data-selected="true"] .mode-check{opacity:1;transform:scale(1)}
   [hidden]{display:none!important}
   .legacy-note{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--warning-color,#ed9b00) 35%,var(--divider-color));border-radius:12px;background:color-mix(in srgb,var(--warning-color,#ed9b00) 7%,var(--secondary-background-color));color:var(--secondary-text-color);font-size:12px;line-height:1.4}
   .legacy-note ha-icon{--mdc-icon-size:17px;flex:0 0 auto;color:var(--warning-color,#ed9b00)}
@@ -1327,7 +1350,7 @@ const CARD_CSS = `
     .dlg-actions-right .btn{flex:0 0 auto;min-height:0}
     .dlg-confirm-actions .btn{flex:0 1 auto}
   }
-  @media(prefers-reduced-motion:reduce){.day,.btn,.add{transition:none}.btn:not(:disabled):hover{transform:none}}
+  @media(prefers-reduced-motion:reduce){.day,.btn,.add,.frequency-control,.frequency-step,.mode-card,.mode-card:before,.mode-icon,.mode-check{transition:none}.btn:not(:disabled):hover,.frequency-step:not(:disabled):hover,.mode-card:hover{transform:none}}
   .preview{pointer-events:none}
 `;
 
@@ -1975,7 +1998,13 @@ export class WaterFlowCard extends HTMLElementBase {
             </div>
             <div class="row-field" data-role="frequency-row" ${mode === 'weekdays' ? 'hidden' : ''}>
               <div><label for="wf-frequency">${esc(strings.frequency)}</label><div class="hint" id="wf-frequency-help" data-role="frequency-help">${esc(frequencyHelpForMode(mode, strings))}</div></div>
-              <input class="input num" id="wf-frequency" type="number" min="1" max="${MAX_FREQUENCY_DAYS}" step="1" aria-describedby="wf-frequency-help" data-field="frequency_days" value="${esc(draft.frequency_days)}">
+              <div class="frequency-control" role="group" aria-label="${esc(strings.frequency)}">
+                <span class="frequency-mark" aria-hidden="true"><ha-icon icon="mdi:calendar-sync"></ha-icon></span>
+                <button class="frequency-step" type="button" data-act="step-frequency" data-direction="-1" aria-label="${esc(strings.decreaseFrequency)}" aria-controls="wf-frequency"><ha-icon icon="mdi:minus"></ha-icon></button>
+                <input class="input num" id="wf-frequency" type="number" min="1" max="${MAX_FREQUENCY_DAYS}" step="1" aria-label="${esc(strings.frequency)}" aria-describedby="wf-frequency-help" data-field="frequency_days" value="${esc(draft.frequency_days)}">
+                <button class="frequency-step" type="button" data-act="step-frequency" data-direction="1" aria-label="${esc(strings.increaseFrequency)}" aria-controls="wf-frequency"><ha-icon icon="mdi:plus"></ha-icon></button>
+                <span class="frequency-unit" data-role="frequency-unit">${esc(strings.frequencyUnit(numeric(draft.frequency_days) ?? 1))}</span>
+              </div>
             </div>
             <div class="row-field" data-role="anchor-row" ${mode !== 'weekdays' && Number(draft.frequency_days) > 1 ? '' : 'hidden'}>
               <div><label for="wf-anchor">${esc(strings.anchor)}</label><div class="hint" id="wf-anchor-help">${esc(strings.anchorHelp || '')}</div></div>
@@ -2103,6 +2132,18 @@ export class WaterFlowCard extends HTMLElementBase {
       input.focus();
       return;
     }
+    if (action === 'step-frequency') {
+      const direction = Number(target.dataset.direction);
+      if (direction !== -1 && direction !== 1) return;
+      const current = Math.round(numeric(draft.frequency_days) ?? 1);
+      const value = Math.max(1, Math.min(MAX_FREQUENCY_DAYS, current + direction));
+      const input = this._dialog?.querySelector('[data-field="frequency_days"]');
+      if (!input) return;
+      input.value = String(value);
+      this._dialogInput(input);
+      input.focus?.();
+      return;
+    }
     if (action === 'set-mode') {
       this._setScheduleMode(target.dataset.mode);
       return;
@@ -2203,6 +2244,10 @@ export class WaterFlowCard extends HTMLElementBase {
     const anchorInput = dialog.querySelector('[data-field="start_date"]');
     const frequencyRow = dialog.querySelector('[data-role="frequency-row"]');
     const frequencyHelp = dialog.querySelector('[data-role="frequency-help"]');
+    const frequencyUnit = dialog.querySelector('[data-role="frequency-unit"]');
+    const frequencyDays = numeric(draft.frequency_days) ?? 1;
+    const decreaseFrequency = dialog.querySelector('[data-act="step-frequency"][data-direction="-1"]');
+    const increaseFrequency = dialog.querySelector('[data-act="step-frequency"][data-direction="1"]');
     const windowHelp = dialog.querySelector('[data-role="window-help"]');
     const empty = dialog.querySelector('[data-role="empty-windows"]');
     const add = dialog.querySelector('[data-act="add-slot"]');
@@ -2217,6 +2262,9 @@ export class WaterFlowCard extends HTMLElementBase {
     if (anchorInput && anchorInput.value !== (draft.start_date || '')) anchorInput.value = draft.start_date || '';
     if (frequencyRow) frequencyRow.hidden = draft.schedule_mode === 'weekdays';
     if (frequencyHelp) frequencyHelp.textContent = frequencyHelpForMode(draft.schedule_mode, strings);
+    if (frequencyUnit) frequencyUnit.textContent = strings.frequencyUnit(frequencyDays);
+    if (decreaseFrequency) decreaseFrequency.disabled = this._busy || frequencyDays <= 1;
+    if (increaseFrequency) increaseFrequency.disabled = this._busy || frequencyDays >= MAX_FREQUENCY_DAYS;
     if (anchorRow) anchorRow.hidden = draft.schedule_mode === 'weekdays' || !(Number(draft.frequency_days) > 1);
     if (windowHelp) windowHelp.textContent = windowHelpForMode(draft.schedule_mode, strings);
     for (const button of dialog.querySelectorAll('[data-act="set-mode"]')) {
@@ -2458,6 +2506,13 @@ const EDITOR_CSS = `
   .ed-input::placeholder{color:var(--secondary-text-color)}
   .ed-input:focus-visible{outline:2px solid var(--primary-color);outline-offset:1px;border-color:transparent}
   ha-entity-picker{flex:0 0 auto;width:100%;max-width:none;min-width:0}
+  .pump-picker{display:flex;align-items:center;gap:12px;width:100%;min-width:0;padding:10px;border:1px solid color-mix(in srgb,var(--water-flow-accent-color,var(--primary-color)) 32%,var(--divider-color));border-radius:16px;background:linear-gradient(135deg,color-mix(in srgb,var(--water-flow-accent-color,var(--primary-color)) 8%,var(--card-background-color,var(--ha-card-background))),var(--secondary-background-color));box-shadow:0 5px 16px rgba(0,0,0,.09),inset 0 1px 0 rgba(255,255,255,.08);transition:border-color .18s,box-shadow .18s,transform .18s}
+  .pump-picker:focus-within{border-color:var(--water-flow-accent-color,var(--primary-color));box-shadow:0 0 0 3px color-mix(in srgb,var(--water-flow-accent-color,var(--primary-color)) 15%,transparent),0 7px 18px rgba(0,0,0,.1)}
+  .pump-picker-icon{width:46px;height:46px;flex:0 0 46px;display:grid;place-items:center;border-radius:14px;background:var(--water-flow-accent-color,var(--primary-color));color:var(--text-primary-color,#fff);box-shadow:0 4px 10px color-mix(in srgb,var(--water-flow-accent-color,var(--primary-color)) 28%,transparent)}
+  .pump-picker-icon ha-icon{--mdc-icon-size:23px}
+  .pump-picker-content{display:flex;flex:1 1 auto;flex-direction:column;gap:1px;min-width:0}
+  .pump-picker-caption{padding-left:8px;color:var(--secondary-text-color);font-size:10px;font-weight:750;letter-spacing:.09em;text-transform:uppercase}
+  .pump-picker ha-entity-picker{flex:1 1 auto;width:100%;max-width:none;min-width:0;--mdc-theme-primary:var(--water-flow-accent-color,var(--primary-color));--mdc-text-field-fill-color:transparent;--mdc-text-field-idle-line-color:transparent;--mdc-text-field-hover-line-color:var(--divider-color);--mdc-text-field-focused-line-color:var(--water-flow-accent-color,var(--primary-color))}
   .sw{appearance:none;-webkit-appearance:none;align-self:flex-end;flex:0 0 auto;position:relative;width:48px;height:44px;border-radius:999px;background:linear-gradient(var(--divider-color),var(--divider-color)) center/44px 28px no-repeat;border:0;margin:0;cursor:pointer;transition:background .2s}
   .sw:after{content:'';position:absolute;top:11px;left:5px;width:22px;height:22px;border-radius:50%;background:var(--text-primary-color,#fff);transition:transform .2s}
   .sw:checked{background:linear-gradient(var(--water-flow-accent-color,var(--primary-color)),var(--water-flow-accent-color,var(--primary-color))) center/44px 28px no-repeat}
@@ -2476,6 +2531,7 @@ const EDITOR_CSS = `
     .ed-txt{flex:1 1 180px}
     .ed-input{flex:1 1 160px;max-width:260px;min-height:0}
     ha-entity-picker{flex:1 1 200px;max-width:320px}
+    .pump-picker{flex:1 1 260px;width:auto;max-width:420px}
     .sw{align-self:center;width:42px;height:24px;background:var(--divider-color)}
     .sw:checked{background:var(--water-flow-accent-color,var(--primary-color))}
     .sw:after{top:3px;left:3px;width:18px;height:18px}
@@ -2485,6 +2541,7 @@ const EDITOR_CSS = `
     .ed-color input[type=color]{height:32px}
     .ed-color button{min-height:0}
   }
+  @media(prefers-reduced-motion:reduce){.pump-picker{transition:none}}
 `;
 
 export class WaterFlowCardEditor extends HTMLElementBase {
@@ -2525,7 +2582,10 @@ export class WaterFlowCardEditor extends HTMLElementBase {
     const selector = entry.selector;
     let control = '';
     if (selector.entity) {
-      control = `<ha-entity-picker data-field="${name}" allow-custom-entity></ha-entity-picker>`;
+      const picker = `<ha-entity-picker data-field="${name}" aria-label="${label}" allow-custom-entity></ha-entity-picker>`;
+      control = name === 'entity'
+        ? `<div class="pump-picker" data-role="pump-picker"><span class="pump-picker-icon" aria-hidden="true"><ha-icon icon="mdi:water-pump"></ha-icon></span><div class="pump-picker-content"><span class="pump-picker-caption">${esc(strings.pumpSelectorLabel)}</span>${picker}</div></div>`
+        : picker;
     } else if (selector.boolean) {
       control = `<input class="sw" type="checkbox" role="switch" data-field="${name}">`;
     } else if (selector.select) {
@@ -2596,6 +2656,7 @@ export class WaterFlowCardEditor extends HTMLElementBase {
       if (entry.selector.boolean) control.checked = Boolean(value);
       else if (entry.selector.entity) {
         control.hass = this._hass;
+        control.includeDomains = entry.selector.entity.filter?.domain || [];
         control.value = typeof value === 'string' && value ? value : null;
         if (!this._pickers.includes(control)) this._pickers.push(control);
       } else if (entry.selector.select) {

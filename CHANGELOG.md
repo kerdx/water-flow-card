@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.0
+
+- Refine schedule frequency and repeat-mode controls with localized day units and accessible increment/decrement buttons bounded to 1–31 days.
+- Give pump selection a polished, accessible presentation while keeping Home Assistant's entity picker and restricting it to switch entities.
+
 ## v1.2.10
 
 - Make the card, schedule dialog, and configuration editor mobile-first with larger touch targets, wrapping status chips, responsive window controls, and desktop layouts restored on wider screens.
