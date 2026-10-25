@@ -889,10 +889,11 @@ const CARD_CSS = `
   .side{flex:0 0 auto;display:flex;align-items:center;gap:8px}
   .round{width:38px;height:38px;border-radius:50%;border:1px solid var(--divider-color);background:var(--secondary-background-color);color:var(--primary-text-color);display:flex;align-items:center;justify-content:center;cursor:pointer}
   .round:hover{border-color:var(--water-flow-accent-color);color:var(--water-flow-accent-color)}
-  .battery-button{height:38px;max-width:116px;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:0 10px;border:1px solid var(--divider-color);border-radius:999px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;font-size:12px;font-weight:650;white-space:nowrap;cursor:pointer;transition:background-color .18s,border-color .18s,color .18s}
+  .battery-button{height:38px;max-width:116px;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:0 10px;border:1px solid var(--divider-color);border-radius:999px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;font-size:12px;font-weight:650;white-space:nowrap;cursor:pointer;appearance:none;-webkit-appearance:none;transition:background-color .18s,border-color .18s,color .18s,box-shadow .18s,transform .12s}
   .battery-button ha-icon{--mdc-icon-size:17px;flex:0 0 auto}
   .battery-button .battery-value{overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
-  .battery-button:hover{background:color-mix(in srgb,var(--water-flow-accent-color) 9%,var(--secondary-background-color));border-color:color-mix(in srgb,var(--water-flow-accent-color) 45%,var(--divider-color));color:var(--water-flow-accent-color)}
+  .battery-button:hover{background:var(--water-flow-accent-color);border-color:var(--water-flow-accent-color);color:var(--text-primary-color,#fff);box-shadow:0 0 0 3px color-mix(in srgb,var(--water-flow-accent-color) 24%,transparent);transform:translateY(-1px)}
+  .battery-button:active{transform:scale(.96);filter:brightness(.9)}
   .battery-button:focus-visible,.round:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
   .subrow{display:flex;gap:8px;padding:0 14px 14px}
   .compact .subrow{padding:0 12px 12px}
@@ -1328,6 +1329,11 @@ export class WaterFlowCard extends HTMLElementBase {
   }
 
   _cardAction() {
+    if ((this.config?.tap_action ?? 'toggle') === 'more-info') {
+      this._clearCardServiceError();
+      fireHaptic(this.config.haptics !== false, this.config.haptics_style);
+      return this._showMoreInfo(this.config.entity);
+    }
     const call = actionCall(this.config?.tap_action ?? 'toggle', this.config.entity);
     if (!call) return;
     this._clearCardServiceError();
@@ -1352,7 +1358,17 @@ export class WaterFlowCard extends HTMLElementBase {
     if (!entity) return Promise.resolve();
     this._clearCardServiceError();
     fireHaptic(this.config.haptics !== false, this.config.haptics_style);
-    return this._service('more', 'more-info', { entity_id: entity });
+    return this._showMoreInfo(entity);
+  }
+
+  _showMoreInfo(entityId) {
+    if (typeof entityId !== 'string' || !entityId) return false;
+    this.dispatchEvent(new CustomEvent('hass-more-info', {
+      detail: { entityId },
+      bubbles: true,
+      composed: true,
+    }));
+    return true;
   }
 
   // --- Schedule dialog -------------------------------------------------

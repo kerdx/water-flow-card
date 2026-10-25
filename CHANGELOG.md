@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.2.4
+
+- Improve hover and pressed feedback for the battery button.
+- Open battery and card entity details through Home Assistant's `hass-more-info` event.
+
 ## v1.2.3
 
 - Automatically detect flow, volume, and battery sensors; manual selections take precedence, and ambiguous matches are left unselected.

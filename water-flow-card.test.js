@@ -402,6 +402,8 @@ test('readout sensors are detected from measurement type and matched to the pump
 });
 
 test('card markup renders state, readouts and the three sub-buttons', () => {
+  assert.match(cardSource(), /\.battery-button:hover\{background:var\(--water-flow-accent-color\)/);
+  assert.match(cardSource(), /\.battery-button:active\{transform:scale/);
   const card = configuredCard({ ...defaultCardConfig('switch.irrigazione'), flow_entity: 'sensor.portata_irrigazione', volume_entity: 'sensor.volume_irrigazione', battery_entity: 'sensor.batteria_irrigazione', auto_entity: 'input_boolean.irrigazione_attiva' });
   card._hass = fakeHass();
   const html = card._cardMarkup();
@@ -453,6 +455,8 @@ test('battery button opens the configured sensor details and follows sensor upda
   const calls = [];
   const card = configuredCard({ ...defaultCardConfig('switch.irrigazione'), battery_entity: 'sensor.batteria_irrigazione' });
   card._hass = fakeHass({ callService: async (...args) => calls.push(args) });
+  const events = [];
+  card.dispatchEvent = (event) => { events.push(event); return true; };
   const before = card._renderKey();
   card._hass = fakeHass({
     states: { ...states, 'sensor.batteria_irrigazione': { state: '42', attributes: { unit_of_measurement: '%' } } },
@@ -460,13 +464,30 @@ test('battery button opens the configured sensor details and follows sensor upda
   });
   assert.notEqual(card._renderKey(), before);
   await card._batteryAction();
-  assert.deepEqual(calls, [['more', 'more-info', { entity_id: 'sensor.batteria_irrigazione' }]]);
+  assert.deepEqual(calls, []);
+  assert.equal(events[0].type, 'hass-more-info');
+  assert.deepEqual(events[0].detail, { entityId: 'sensor.batteria_irrigazione' });
+  assert.equal(events[0].bubbles, true);
+  assert.equal(events[0].composed, true);
 
-  const autoCalls = [];
+  const autoEvents = [];
   const autoDetectedCard = configuredCard(defaultCardConfig('switch.irrigazione'));
-  autoDetectedCard._hass = fakeHass({ callService: async (...args) => autoCalls.push(args) });
+  autoDetectedCard._hass = fakeHass();
+  autoDetectedCard.dispatchEvent = (event) => { autoEvents.push(event); return true; };
   await autoDetectedCard._batteryAction();
-  assert.deepEqual(autoCalls, [['more', 'more-info', { entity_id: 'sensor.batteria_irrigazione' }]]);
+  assert.equal(autoEvents[0].detail.entityId, 'sensor.batteria_irrigazione');
+});
+
+test('more-info card action uses the Home Assistant event instead of a service call', () => {
+  const calls = [];
+  const events = [];
+  const card = configuredCard({ ...defaultCardConfig('switch.irrigazione'), tap_action: 'more-info' });
+  card._hass = fakeHass({ callService: async (...args) => calls.push(args) });
+  card.dispatchEvent = (event) => { events.push(event); return true; };
+  card._cardAction();
+  assert.deepEqual(calls, []);
+  assert.equal(events[0].type, 'hass-more-info');
+  assert.deepEqual(events[0].detail, { entityId: 'switch.irrigazione' });
 });
 
 test('schedule duration and liters use visible, localized accessible steppers', () => {
