@@ -66,7 +66,7 @@ class PackageTests(unittest.TestCase):
         for service in registered:
             self.assertIn(f"{service}:", text)
         # Every service field the schema accepts is documented.
-        for field in ("water_entity", "enabled", "slots", "frequency_days", "start_date", "auto_entity"):
+        for field in ("water_entity", "enabled", "slots", "schedule_mode", "frequency_days", "start_date", "auto_entity"):
             self.assertIn(field, text)
         self.assertIn('domain: switch', text)
         self.assertIn('domain: input_boolean', text)

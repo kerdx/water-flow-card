@@ -26,6 +26,9 @@
     "invalid_frequency": {
       "message": "frequency_days must be a whole number between 1 and {max}."
     },
+    "invalid_schedule_mode": {
+      "message": "schedule_mode must be weekdays, interval, or legacy."
+    },
     "invalid_start_date": {
       "message": "start_date must use the YYYY-MM-DD format."
     },

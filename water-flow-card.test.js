@@ -11,7 +11,7 @@ import {
   normalizeLayout, normalizeCardAction, normalizeHapticStyle, normalizeAnimationDuration,
   CARD_SURFACES, CARD_ACTIONS, HAPTIC_STYLES, ANIMATION_DURATION_DEFAULT, MAX_SLOTS, MAX_DURATION_MINUTES,
   MAX_FREQUENCY_DAYS, WATER_FLOW_DOMAIN, numeric, formatNumber, formatDuration, chipValue, sessionMinutes,
-  pumpStateLabel, cardTitle, frequencyAllows, activeSlotFor, activeProgram, nextWindowMs, timeMinutes, stepScheduleValue,
+   pumpStateLabel, workStateLabel, deviceStatusLabel, cardTitle, frequencyAllows, activeSlotFor, activeProgram, nextWindowMs, timeMinutes, timestampClock, stepScheduleValue,
   programSensor, programOf, discoverSensorEntity, scheduleDraft, emptyScheduleDraft, validateScheduleDraft, programPayload,
   deleteProgramPayload, actionCall, toggleAutoCall, hapticPattern, fireHaptic,
 } from './custom_components/water_flow_scheduler/www/water-flow-card.js';
@@ -25,6 +25,17 @@ const states = {
   'sensor.portata_irrigazione': { state: '12.5', attributes: { unit_of_measurement: 'L/min' } },
   'sensor.volume_irrigazione': { state: '3.2', attributes: { unit_of_measurement: 'm³' } },
   'sensor.batteria_irrigazione': { state: '87', attributes: { unit_of_measurement: '%' } },
+  'binary_sensor.irrigazione_valve_work_state': { state: 'off', attributes: { friendly_name: 'Irrigazione Valve work state' } },
+  'sensor.irrigazione_current_device_status': { state: 'normal_state', attributes: { friendly_name: 'Irrigazione Current device status' } },
+  'sensor.irrigazione_cyclic_quantitative_irrigation': { state: 'irrigazione', attributes: { friendly_name: 'Irrigazione Cyclic quantitative irrigation' } },
+  'sensor.irrigazione_cyclic_timed_irrigation': { state: 'irrigazione', attributes: { friendly_name: 'Irrigazione Cyclic timed irrigation' } },
+  'sensor.irrigazione_daily_irrigation_volume': { state: '5', attributes: { unit_of_measurement: 'L' } },
+  'sensor.irrigazione_flow': { state: '0', attributes: { unit_of_measurement: 'm³/h', device_class: 'volume_flow_rate', state_class: 'measurement' } },
+  'sensor.irrigazione_irrigation_start_time': { state: '1792957393', attributes: {} },
+  'sensor.irrigazione_irrigation_end_time': { state: '1792957395', attributes: {} },
+  'sensor.irrigazione_real_time_irrigation_duration': { state: '15', attributes: { unit_of_measurement: 's' } },
+  'sensor.irrigazione_real_time_irrigation_volume': { state: '3745', attributes: { unit_of_measurement: 'L' } },
+  'switch.irrigazione_auto_close_when_water_shortage': { state: 'on', attributes: { friendly_name: 'Auto close when water shortage' } },
   'sensor.water_flow_scheduler_programs': {
     state: 'ready',
     attributes: {
@@ -103,11 +114,21 @@ test('schema selectors describe the water entities and card options', () => {
   assert.deepEqual(fields.find((entry) => entry.name === 'auto_entity').selector.entity, { filter: { domain: ['input_boolean'] } });
   assert.deepEqual(fields.find((entry) => entry.name === 'flow_entity').selector.entity, { filter: { domain: ['sensor'] } });
   assert.deepEqual(fields.find((entry) => entry.name === 'battery_entity').selector.entity, { filter: { domain: ['sensor'] } });
+  assert.deepEqual(fields.find((entry) => entry.name === 'work_state_entity').selector.entity, { filter: { domain: ['binary_sensor'] } });
+  assert.deepEqual(fields.find((entry) => entry.name === 'device_status_entity').selector.entity, { filter: { domain: ['sensor'] } });
+  assert.deepEqual(fields.find((entry) => entry.name === 'irrigation_mode_entity').selector.entity, { filter: { domain: ['sensor'] } });
+  assert.deepEqual(fields.find((entry) => entry.name === 'timed_irrigation_entity').selector.entity, { filter: { domain: ['sensor'] } });
+  assert.deepEqual(fields.find((entry) => entry.name === 'daily_volume_entity').selector.entity, { filter: { domain: ['sensor'] } });
+  assert.deepEqual(fields.find((entry) => entry.name === 'real_time_volume_entity').selector.entity, { filter: { domain: ['sensor'] } });
+  assert.deepEqual(fields.find((entry) => entry.name === 'real_time_duration_entity').selector.entity, { filter: { domain: ['sensor'] } });
+  assert.deepEqual(fields.find((entry) => entry.name === 'irrigation_start_time_entity').selector.entity, { filter: { domain: ['sensor'] } });
+  assert.deepEqual(fields.find((entry) => entry.name === 'irrigation_end_time_entity').selector.entity, { filter: { domain: ['sensor'] } });
+  assert.deepEqual(fields.find((entry) => entry.name === 'shortage_protection_entity').selector.entity, { filter: { domain: ['switch'] } });
   assert.deepEqual(fields.find((entry) => entry.name === 'layout').selector, { select: { mode: 'dropdown', options: ['pill', 'compact'] } });
   assert.deepEqual(fields.find((entry) => entry.name === 'surface').selector, { select: { mode: 'dropdown', options: CARD_SURFACES } });
   assert.deepEqual(fields.find((entry) => entry.name === 'tap_action').selector, { select: { mode: 'dropdown', options: CARD_ACTIONS } });
-  for (const name of ['name', 'icon', 'accent_color', 'language', 'program_entity', 'battery_entity', 'show_state_chip', 'show_flow_chip',
-    'show_volume_chip', 'show_battery_button', 'show_next_change_chip', 'show_unavailable_badge', 'show_auto_button', 'show_schedule_button',
+  for (const name of ['name', 'icon', 'accent_color', 'language', 'program_entity', 'battery_entity', 'work_state_entity', 'device_status_entity', 'irrigation_mode_entity', 'timed_irrigation_entity', 'daily_volume_entity', 'real_time_volume_entity', 'real_time_duration_entity', 'irrigation_start_time_entity', 'irrigation_end_time_entity', 'shortage_protection_entity', 'show_state_chip', 'show_flow_chip',
+    'show_volume_chip', 'show_battery_button', 'show_next_change_chip', 'show_unavailable_badge', 'show_auto_button', 'show_schedule_button', 'show_work_state_button', 'show_device_status_chip', 'show_irrigation_mode_chip', 'show_timed_irrigation_chip', 'show_daily_volume_chip', 'show_real_time_volume_chip', 'show_real_time_duration_chip', 'show_irrigation_time_chips', 'show_shortage_protection_button',
     'hold_action', 'double_tap_action', 'haptics', 'haptics_style', 'animations', 'animation_duration']) {
     assert.ok(names.includes(name), name);
   }
@@ -117,7 +138,10 @@ test('defaults, suggestion and stub config nest the card type', () => {
   assert.deepEqual(defaultCardConfig('switch.irrigazione'), {
     entity: 'switch.irrigazione', layout: 'pill',
     show_state_chip: true, show_flow_chip: true, show_volume_chip: true, show_battery_button: true, show_next_change_chip: true,
-    show_unavailable_badge: true, show_auto_button: true, show_schedule_button: true,
+    show_unavailable_badge: true, show_auto_button: true, show_schedule_button: true, show_work_state_button: true,
+    show_device_status_chip: true, show_irrigation_mode_chip: true, show_timed_irrigation_chip: true,
+    show_daily_volume_chip: true, show_real_time_volume_chip: true, show_real_time_duration_chip: true,
+    show_irrigation_time_chips: true, show_shortage_protection_button: true,
   });
   assert.deepEqual(getEntitySuggestion({}, 'switch.irrigazione'), {
     config: { type: 'custom:water-flow-card', ...defaultCardConfig('switch.irrigazione') },
@@ -169,11 +193,23 @@ test('option normalizers validate loudly on hand-written YAML', () => {
   assert.equal(normalizeAnimationDuration(-5), ANIMATION_DURATION_DEFAULT);
   assert.deepEqual(HAPTIC_STYLES, ['light', 'medium', 'heavy']);
 
+  assert.equal(workStateLabel('on', cardStrings('it')), 'Attiva');
+  assert.equal(workStateLabel('off', cardStrings('it')), 'Spenta');
+  assert.equal(workStateLabel('unavailable', cardStrings('it')), 'Non disponibile');
+  assert.equal(deviceStatusLabel('normal_state', cardStrings('it')), 'Normale');
+  assert.equal(deviceStatusLabel('fault', cardStrings('it')), 'fault');
+  assert.match(timestampClock(1792957393, 'it-IT'), /^\d{1,2}:\d{2}$/);
   assert.throws(() => configuredCard({ ...defaultCardConfig('switch.irrigazione'), accent_color: 'red' }), /hex colour/);
   assert.throws(() => configuredCard({ ...defaultCardConfig('switch.irrigazione'), surface: 'glass' }), /surface must be one of/);
   assert.throws(() => configuredCard({ ...defaultCardConfig('switch.irrigazione'), tap_action: 'call-service' }), /tap_action must be one of/);
   assert.throws(() => configuredCard({ ...defaultCardConfig('switch.irrigazione'), layout: 'wide' }), /layout must be pill or compact/);
   assert.throws(() => configuredCard({ ...defaultCardConfig('switch.irrigazione'), haptics_style: 'strong' }), /haptics_style must be one of/);
+  assert.throws(() => configuredCard({ ...defaultCardConfig('switch.irrigazione'), work_state_entity: 'sensor.irrigazione' }), /work_state_entity must be a binary_sensor/);
+  assert.throws(() => configuredCard({ ...defaultCardConfig('switch.irrigazione'), device_status_entity: 'binary_sensor.irrigazione' }), /device_status_entity must be a sensor/);
+  assert.throws(() => configuredCard({ ...defaultCardConfig('switch.irrigazione'), irrigation_mode_entity: 'binary_sensor.irrigazione' }), /irrigation_mode_entity must be a sensor/);
+  assert.throws(() => configuredCard({ ...defaultCardConfig('switch.irrigazione'), timed_irrigation_entity: 'binary_sensor.irrigazione' }), /timed_irrigation_entity must be a sensor/);
+  assert.throws(() => configuredCard({ ...defaultCardConfig('switch.irrigazione'), daily_volume_entity: 'binary_sensor.irrigazione' }), /daily_volume_entity must be a sensor/);
+  assert.throws(() => configuredCard({ ...defaultCardConfig('switch.irrigazione'), shortage_protection_entity: 'input_boolean.irrigazione' }), /shortage_protection_entity must be a switch/);
   assert.throws(() => configuredCard({ entity: 'light.living_room' }), /switch entity/);
   assert.throws(() => configuredCard({}), /switch entity/);
   assert.equal(configuredCard({ ...defaultCardConfig('switch.irrigazione'), accent_color: '#ABCDEF' }).config.accent_color, '#abcdef');
@@ -198,6 +234,7 @@ test('client validation mirrors the backend codes', () => {
   const withSlots = (slots, extra = {}) => ({ ...base(), ...extra, slots });
   const expect = (draft, code, context = {}) => assert.deepEqual(validateScheduleDraft(draft), { ok: false, code, context });
 
+  expect(withSlots([{ id: 'a', days: [1], start: '05:30', duration: 30 }], { schedule_mode: 'unknown' }), 'invalid_schedule_mode');
   expect(withSlots([{ id: 'a', days: [1], start: '5:30', duration: 30 }]), 'invalid_time');
   expect(withSlots([{ id: 'a', days: [1], start: '05:30', duration: 0 }]), 'invalid_duration', { max: MAX_DURATION_MINUTES });
   expect(withSlots([{ id: 'a', days: [1], start: '05:30', duration: 1441 }]), 'invalid_duration', { max: MAX_DURATION_MINUTES });
@@ -213,10 +250,10 @@ test('client validation mirrors the backend codes', () => {
   expect(withSlots([{ id: 'a', days: [1], start: '05:30', duration: 60 }, { id: 'b', days: [1], start: '06:00', duration: 30 }]), 'slots_overlap', { a: 'a', b: 'b' });
   expect(withSlots([]), 'empty_enabled_program');
   expect(withSlots(Array.from({ length: MAX_SLOTS + 1 }, (_, index) => ({ id: `s${index}`, days: [1], start: '05:30', duration: 1 }))), 'too_many_slots', { max: MAX_SLOTS });
-  expect(withSlots([{ id: 'a', days: [1], start: '05:30', duration: 30 }], { frequency_days: 0 }), 'invalid_frequency', { max: MAX_FREQUENCY_DAYS });
-  expect(withSlots([{ id: 'a', days: [1], start: '05:30', duration: 30 }], { frequency_days: 99 }), 'invalid_frequency', { max: MAX_FREQUENCY_DAYS });
-  expect(withSlots([{ id: 'a', days: [1], start: '05:30', duration: 30 }], { frequency_days: 2, start_date: '' }), 'frequency_needs_anchor');
-  expect(withSlots([{ id: 'a', days: [1], start: '05:30', duration: 30 }], { frequency_days: 2, start_date: '2026-02-30' }), 'invalid_start_date');
+  expect(withSlots([{ id: 'a', days: [1], start: '05:30', duration: 30 }], { schedule_mode: 'interval', frequency_days: 0 }), 'invalid_frequency', { max: MAX_FREQUENCY_DAYS });
+  expect(withSlots([{ id: 'a', days: [1], start: '05:30', duration: 30 }], { schedule_mode: 'interval', frequency_days: 99 }), 'invalid_frequency', { max: MAX_FREQUENCY_DAYS });
+  expect(withSlots([{ id: 'a', days: [1], start: '05:30', duration: 30 }], { schedule_mode: 'interval', frequency_days: 2, start_date: '' }), 'frequency_needs_anchor');
+  expect(withSlots([{ id: 'a', days: [1], start: '05:30', duration: 30 }], { schedule_mode: 'interval', frequency_days: 2, start_date: '2026-02-30' }), 'invalid_start_date');
   expect(withSlots([{ id: 'a', days: [1], start: '05:30', duration: 30 }], { auto_entity: 'light.living_room' }), 'invalid_auto_entity');
   expect(withSlots('nope'), 'invalid_slots');
   expect({ ...base(), enabled: 'yes' }, 'invalid_enabled');
@@ -227,6 +264,8 @@ test('client validation mirrors the backend codes', () => {
   ]), 'slots_overlap', { a: 'a', b: 'b' });
   // Empty liters stay accepted and are dropped from the payload.
   assert.deepEqual(validateScheduleDraft(withSlots([{ id: 'a', days: [1], start: '05:30', duration: 30, liters: '' }])), { ok: true, code: null, context: {} });
+  assert.deepEqual(validateScheduleDraft(withSlots([{ id: 'a', days: [], start: '05:30', duration: 30 }], { schedule_mode: 'interval' })), { ok: true, code: null, context: {} });
+  expect(withSlots([{ id: 'a', days: [], start: '05:30', duration: 30 }], { schedule_mode: 'weekdays' }), 'invalid_days');
 });
 
 test('service payloads carry exactly what the backend schema accepts', () => {
@@ -238,7 +277,7 @@ test('service payloads carry exactly what the backend schema accepts', () => {
     ],
   });
   assert.deepEqual(programPayload('switch.irrigazione', draft), {
-    water_entity: 'switch.irrigazione', enabled: true,
+    water_entity: 'switch.irrigazione', enabled: true, schedule_mode: 'legacy',
     slots: [
       { id: 'morning', days: [1, 3, 5], start: '05:30', duration: 30, liters: 120 },
       { id: 'evening', days: [2, 4], start: '19:00', duration: 45 },
@@ -248,6 +287,7 @@ test('service payloads carry exactly what the backend schema accepts', () => {
   const daily = scheduleDraft({ enabled: false, slots: [{ id: 'a', days: [1], start: '05:30', duration: 30 }] });
   const payload = programPayload('switch.irrigazione', daily);
   assert.equal(payload.frequency_days, 1);
+  assert.equal(payload.schedule_mode, 'weekdays');
   assert.equal(Object.hasOwn(payload, 'start_date'), false);
   assert.equal(Object.hasOwn(payload, 'auto_entity'), false);
   assert.deepEqual(deleteProgramPayload('switch.irrigazione'), { water_entity: 'switch.irrigazione' });
@@ -261,6 +301,7 @@ test('drafts round-trip a stored program without losing fields', () => {
   const program = states['sensor.water_flow_scheduler_programs'].attributes.programs['switch.irrigazione'];
   const draft = scheduleDraft(program);
   assert.equal(draft.enabled, true);
+  assert.equal(draft.schedule_mode, 'legacy');
   assert.equal(draft.frequency_days, 2);
   assert.equal(draft.start_date, '2026-05-01');
   assert.equal(draft.auto_entity, 'input_boolean.irrigazione_attiva');
@@ -286,6 +327,19 @@ test('frequency rhythm follows the anchor date', () => {
   assert.equal(frequencyAllows({ frequency_days: 2 }, anchor), false);
   assert.equal(frequencyAllows({ frequency_days: 2, start_date: 'not-a-date' }, anchor), false);
   assert.equal(frequencyAllows(null, anchor), true);
+});
+
+test('interval mode ignores weekdays and lets eligible windows finish after midnight', () => {
+  const program = {
+    enabled: true, schedule_mode: 'interval', frequency_days: 2, start_date: '2026-05-04',
+    slots: [{ id: 'cycle', days: [], start: '23:00', duration: 120 }],
+  };
+  const at = (year, month, day, hour, minute) => new Date(year, month, day, hour, minute).getTime();
+  assert.equal(activeProgram(program, at(2026, 4, 4, 23, 30)).slotId, 'cycle');
+  assert.equal(activeProgram(program, at(2026, 4, 5, 0, 30)).slotId, 'cycle');
+  assert.equal(activeProgram(program, at(2026, 4, 5, 1, 0)).slotId, null);
+  assert.equal(activeProgram(program, at(2026, 4, 5, 23, 30)).slotId, null);
+  assert.equal(activeProgram(program, at(2026, 4, 6, 23, 30)).slotId, 'cycle');
 });
 
 test('frequency-aware status and forecast skip off-cycle windows', () => {
@@ -387,7 +441,12 @@ test('program sensor discovery prefers the explicit entity and falls back to the
 });
 
 test('readout sensors are detected from measurement type and matched to the pump when needed', () => {
-  const hass = fakeHass();
+  const hass = fakeHass({ states: {
+    'switch.irrigazione': states['switch.irrigazione'],
+    'sensor.portata_irrigazione': states['sensor.portata_irrigazione'],
+    'sensor.volume_irrigazione': states['sensor.volume_irrigazione'],
+    'sensor.batteria_irrigazione': states['sensor.batteria_irrigazione'],
+  } });
   assert.equal(discoverSensorEntity(hass, 'switch.irrigazione', 'flow'), 'sensor.portata_irrigazione');
   assert.equal(discoverSensorEntity(hass, 'switch.irrigazione', 'volume'), 'sensor.volume_irrigazione');
   assert.equal(discoverSensorEntity(hass, 'switch.irrigazione', 'battery'), 'sensor.batteria_irrigazione');
@@ -401,19 +460,48 @@ test('readout sensors are detected from measurement type and matched to the pump
   assert.equal(discoverSensorEntity(multipleBatteries, 'switch.altro', 'battery'), null);
 });
 
-test('card markup renders state, readouts and the three sub-buttons', () => {
+test('card markup renders state, readouts and optional valve feedback control', () => {
   assert.match(cardSource(), /\.battery-button:hover\{background:var\(--water-flow-accent-color\)/);
   assert.match(cardSource(), /\.battery-button:active\{transform:scale/);
-  const card = configuredCard({ ...defaultCardConfig('switch.irrigazione'), flow_entity: 'sensor.portata_irrigazione', volume_entity: 'sensor.volume_irrigazione', battery_entity: 'sensor.batteria_irrigazione', auto_entity: 'input_boolean.irrigazione_attiva' });
+  const card = configuredCard({
+    ...defaultCardConfig('switch.irrigazione'),
+    flow_entity: 'sensor.irrigazione_flow',
+    volume_entity: 'sensor.volume_irrigazione',
+    battery_entity: 'sensor.batteria_irrigazione',
+    work_state_entity: 'binary_sensor.irrigazione_valve_work_state',
+    device_status_entity: 'sensor.irrigazione_current_device_status',
+    irrigation_mode_entity: 'sensor.irrigazione_cyclic_quantitative_irrigation',
+    timed_irrigation_entity: 'sensor.irrigazione_cyclic_timed_irrigation',
+    daily_volume_entity: 'sensor.irrigazione_daily_irrigation_volume',
+    real_time_volume_entity: 'sensor.irrigazione_real_time_irrigation_volume',
+    real_time_duration_entity: 'sensor.irrigazione_real_time_irrigation_duration',
+    irrigation_start_time_entity: 'sensor.irrigazione_irrigation_start_time',
+    irrigation_end_time_entity: 'sensor.irrigazione_irrigation_end_time',
+    shortage_protection_entity: 'switch.irrigazione_auto_close_when_water_shortage',
+    auto_entity: 'input_boolean.irrigazione_attiva',
+  });
   card._hass = fakeHass();
   const html = card._cardMarkup();
   assert.match(html, /Irrigazione/);
   assert.match(html, /In irrigazione/);
-  assert.match(html, /Portata 12,5 L\/min/);
+  assert.match(html, /Portata 0 m³\/h/);
   assert.match(html, /Volume 3,2 m³/);
   assert.match(html, /data-act="battery" aria-label="Batteria 87 %"/);
   assert.match(html, /icon="mdi:battery"><\/ha-icon><span class="battery-value">87 %/);
   assert.match(html, /data-act="auto"/);
+  assert.match(html, /data-act="work-toggle" data-active="false" aria-pressed="false"/);
+  assert.match(html, /aria-label="Valvola spenta\. Tocca per attivarla\."/);
+  assert.match(html, /Valvola · Spenta/);
+  assert.match(html, /Stato dispositivo · Normale/);
+  assert.match(html, /Modalità · irrigazione/);
+  assert.match(html, /Ciclo temporizzato · irrigazione/);
+  assert.match(html, /Oggi · 5 L/);
+  assert.match(html, /Volume attuale · 3745 L/);
+  assert.match(html, /Durata · 15 s/);
+  assert.match(html, /class="irrigation-start-chip">Inizio · /);
+  assert.match(html, /class="irrigation-end-chip">Fine · /);
+  assert.match(html, /data-act="shortage-protection" data-active="true" aria-pressed="true"/);
+  assert.match(html, /Protezione acqua · Attiva/);
   assert.match(html, /data-act="schedule" data-focus="slots"/);
   assert.match(html, /data-act="schedule" data-focus="frequency"/);
   assert.match(html, /Ogni 2 giorni/);
@@ -449,6 +537,56 @@ test('card markup renders state, readouts and the three sub-buttons', () => {
   const noBatteryButton = configuredCard({ ...defaultCardConfig('switch.irrigazione'), battery_entity: 'sensor.batteria_irrigazione', show_battery_button: false });
   noBatteryButton._hass = fakeHass();
   assert.ok(!noBatteryButton._cardMarkup().includes('data-act="battery"'));
+  const noWorkStateButton = configuredCard({ ...defaultCardConfig('switch.irrigazione'), work_state_entity: 'binary_sensor.irrigazione_valve_work_state', show_work_state_button: false });
+  noWorkStateButton._hass = fakeHass();
+  assert.ok(!noWorkStateButton._cardMarkup().includes('data-act="work-toggle"'));
+  const noModeChip = configuredCard({ ...defaultCardConfig('switch.irrigazione'), irrigation_mode_entity: 'sensor.irrigazione_cyclic_quantitative_irrigation', show_irrigation_mode_chip: false });
+  noModeChip._hass = fakeHass();
+  assert.ok(!noModeChip._cardMarkup().includes('class="irrigation-mode-chip"'));
+  const noTimedChip = configuredCard({ ...defaultCardConfig('switch.irrigazione'), timed_irrigation_entity: 'sensor.irrigazione_cyclic_timed_irrigation', show_timed_irrigation_chip: false });
+  noTimedChip._hass = fakeHass();
+  assert.ok(!noTimedChip._cardMarkup().includes('class="timed-irrigation-chip"'));
+  const noProtectionButton = configuredCard({ ...defaultCardConfig('switch.irrigazione'), shortage_protection_entity: 'switch.irrigazione_auto_close_when_water_shortage', show_shortage_protection_button: false });
+  noProtectionButton._hass = fakeHass();
+  assert.ok(!noProtectionButton._cardMarkup().includes('data-act="shortage-protection"'));
+});
+
+test('valve feedback button toggles the configured switch and follows sensor updates', async () => {
+  const calls = [];
+  const config = {
+    ...defaultCardConfig('switch.irrigazione'),
+    work_state_entity: 'binary_sensor.irrigazione_valve_work_state',
+    device_status_entity: 'sensor.irrigazione_current_device_status',
+    irrigation_mode_entity: 'sensor.irrigazione_cyclic_quantitative_irrigation',
+    timed_irrigation_entity: 'sensor.irrigazione_cyclic_timed_irrigation',
+    shortage_protection_entity: 'switch.irrigazione_auto_close_when_water_shortage',
+  };
+  const card = configuredCard(config);
+  card._hass = fakeHass({ callService: async (...args) => calls.push(args) });
+  const before = card._renderKey();
+  card._hass = fakeHass({
+    states: {
+      ...states,
+      'binary_sensor.irrigazione_valve_work_state': { state: 'on', attributes: {} },
+      'sensor.irrigazione_current_device_status': { state: 'flow_alarm', attributes: {} },
+      'sensor.irrigazione_cyclic_quantitative_irrigation': { state: 'manual_mode', attributes: {} },
+      'sensor.irrigazione_cyclic_timed_irrigation': { state: 'timer_running', attributes: {} },
+      'switch.irrigazione_auto_close_when_water_shortage': { state: 'off', attributes: {} },
+    },
+    callService: async (...args) => calls.push(args),
+  });
+  assert.notEqual(card._renderKey(), before);
+  assert.match(card._cardMarkup(), /data-act="work-toggle" data-active="true" aria-pressed="true"/);
+  assert.match(card._cardMarkup(), /Stato dispositivo · flow_alarm/);
+  assert.match(card._cardMarkup(), /Modalità · manual_mode/);
+  assert.match(card._cardMarkup(), /Ciclo temporizzato · timer_running/);
+  assert.match(card._cardMarkup(), /Protezione acqua · Disattiva/);
+  await card._toggleWorkState();
+  await card._toggleShortageProtection();
+  assert.deepEqual(calls, [
+    ['switch', 'toggle', { entity_id: 'switch.irrigazione' }],
+    ['switch', 'toggle', { entity_id: 'switch.irrigazione_auto_close_when_water_shortage' }],
+  ]);
 });
 
 test('battery button opens the configured sensor details and follows sensor updates', async () => {
@@ -782,7 +920,8 @@ test('card source keeps the dialog, the scheduler services and no prompts', () =
   assert.match(source, /water_flow_scheduler/);
   assert.match(source, /input_boolean/);
   // The dialog explains the rhythm and the auto helper with localized hints.
-  assert.match(source, /strings\.frequencyHelp/);
+  assert.match(source, /strings\.intervalFrequencyHelp/);
+  assert.match(source, /strings\.legacyFrequencyHelp/);
   assert.match(source, /strings\.autoHelp/);
   assert.match(source, /strings\.scheduleEnabledHelp/);
   assert.match(source, /\.status-line span\+span:before\{content:' · '\}/);

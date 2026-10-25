@@ -21,6 +21,7 @@ AUTO_ENTITY_DOMAINS = ("input_boolean",)
 MAX_SLOTS = 50
 MAX_DURATION_MINUTES = 1440
 MAX_FREQUENCY_DAYS = 31
+SCHEDULE_MODES = ("weekdays", "interval", "legacy")
 # Every slot key is exact, like every other slot rule below: the card and the
 # service must agree on one shape.
 SLOT_KEYS = frozenset({"id", "days", "start", "duration"})
@@ -144,6 +145,16 @@ def _frequency(value: Any) -> int:
     return value
 
 
+def _schedule_mode(value: Any, frequency: int) -> str:
+    # Existing callers and stored programs without a mode keep the historic
+    # weekday-plus-interval behavior when they used a multi-day frequency.
+    if value is None:
+        return "legacy" if frequency > 1 else "weekdays"
+    if value not in SCHEDULE_MODES:
+        raise ScheduleError("schedule_mode must be weekdays, interval, or legacy", "invalid_schedule_mode")
+    return value
+
+
 def _anchor(value: Any) -> date | None:
     if value is None:
         return None
@@ -175,6 +186,7 @@ def validate_program(
     frequency_days: Any = 1,
     start_date: Any = None,
     auto_entity: Any = None,
+    schedule_mode: Any = None,
 ) -> dict[str, Any]:
     """Validate one irrigation program and return its normalized form."""
     if not isinstance(enabled, bool):
@@ -185,9 +197,15 @@ def validate_program(
         raise ScheduleError(f"A program may contain at most {MAX_SLOTS} slots", "too_many_slots", max=MAX_SLOTS)
     if enabled and not slots:
         raise ScheduleError("An enabled program must contain at least one slot", "empty_enabled_program")
-    frequency = _frequency(frequency_days)
-    anchor = _anchor(start_date)
-    if frequency > 1 and anchor is None:
+    requested_frequency = _frequency(frequency_days)
+    mode = _schedule_mode(schedule_mode, requested_frequency)
+    if mode == "weekdays":
+        frequency = 1
+        anchor = None
+    else:
+        frequency = requested_frequency
+        anchor = _anchor(start_date)
+    if mode != "weekdays" and frequency > 1 and anchor is None:
         raise ScheduleError(
             "A frequency above one day needs a start_date anchor", "frequency_needs_anchor"
         )
@@ -216,8 +234,12 @@ def validate_program(
             raise ScheduleError(f"Duplicate slot id: {slot_id}", "duplicate_slot_id", id=slot_id)
         ids.add(slot_id)
         days = slot["days"]
-        if not isinstance(days, list) or not days or any(type(day) is not int or day not in range(1, 8) for day in days):
-            raise ScheduleError("days must be a non-empty list of ISO weekdays 1..7", "invalid_days")
+        if (
+            not isinstance(days, list)
+            or (mode != "interval" and not days)
+            or any(type(day) is not int or day not in range(1, 8) for day in days)
+        ):
+            raise ScheduleError("days must be a list of ISO weekdays 1..7", "invalid_days")
         if len(set(days)) != len(days):
             raise ScheduleError("days cannot contain duplicates", "duplicate_days")
         start = _minute(slot["start"])
@@ -227,7 +249,8 @@ def validate_program(
         if liters is not None:
             clean["liters"] = liters
         result.append(clean)
-        for day in sorted(set(days)):
+        occupied_days = range(1, 8) if mode == "interval" else sorted(set(days))
+        for day in occupied_days:
             for target_day, lo, hi in _slot_intervals(day, start, duration):
                 for old_lo, old_hi, old_id in occupied[target_day]:
                     if lo < old_hi and old_lo < hi:
@@ -239,6 +262,7 @@ def validate_program(
         "frequency_days": frequency,
         "start_date": anchor.isoformat() if anchor else None,
         "auto_entity": auto,
+        "schedule_mode": mode,
     }
 
 
@@ -250,7 +274,7 @@ def _slot_intervals(day: int, start: int, duration: int) -> list[tuple[int, int,
     return [(day, start, end)]
 
 
-def active_slot(slots: list[dict[str, Any]], now: datetime) -> dict[str, Any] | None:
+def active_slot(slots: list[dict[str, Any]], now: datetime, schedule_mode: str | None = None) -> dict[str, Any] | None:
     """The slot whose watering window covers ``now``, or ``None``.
 
     A window that runs past midnight also covers the early minutes of the
@@ -262,17 +286,44 @@ def active_slot(slots: list[dict[str, Any]], now: datetime) -> dict[str, Any] | 
         start = _minute(slot["start"])
         if minute < start:
             # The window that covers this minute started yesterday.
-            if ((weekday - 2) % 7 + 1) not in slot["days"]:
+            if schedule_mode != "interval" and ((weekday - 2) % 7 + 1) not in slot["days"]:
                 continue
-        elif weekday not in slot["days"]:
+        elif schedule_mode != "interval" and weekday not in slot["days"]:
             continue
         if (minute - start) % 1440 < slot["duration"]:
             return slot
     return None
 
 
+def active_program_slot(program: dict[str, Any], now: datetime) -> dict[str, Any] | None:
+    """Return the running window while respecting the date its window began."""
+    mode = program.get("schedule_mode")
+    if mode != "interval":
+        return active_slot(program["slots"], now, mode) if frequency_allows(program, now) else None
+
+    previous_day = now - timedelta(days=1)
+    current_eligible = frequency_allows(program, now)
+    previous_eligible = frequency_allows(program, previous_day)
+    minute = now.hour * 60 + now.minute
+    for slot in program["slots"]:
+        start = _minute(slot["start"])
+        if minute >= start:
+            if not current_eligible:
+                continue
+            elapsed = minute - start
+        else:
+            if not previous_eligible:
+                continue
+            elapsed = 1440 - start + minute
+        if elapsed < slot["duration"]:
+            return slot
+    return None
+
+
 def frequency_allows(program: dict[str, Any], now: datetime) -> bool:
     """Whether the every-N-days rhythm lands on ``now``'s local date."""
+    if program.get("schedule_mode") == "weekdays":
+        return True
     frequency = int(program.get("frequency_days") or 1)
     if frequency <= 1:
         return True
@@ -306,13 +357,17 @@ def program_status(
     now: datetime,
     frequency_days: int = 1,
     start_date: str | None = None,
+    schedule_mode: str | None = None,
 ) -> tuple[dict[str, Any] | None, datetime | None]:
     """Return the actionable slot and next pump-state change."""
     if not enabled:
         return None, None
-    program = {"enabled": enabled, "slots": slots, "frequency_days": frequency_days, "start_date": start_date}
-    slot = active_slot(slots, now) if frequency_allows(program, now) else None
-    return slot, next_boundary(slots, now, frequency_days, start_date)
+    program = {
+        "enabled": enabled, "slots": slots, "frequency_days": frequency_days,
+        "start_date": start_date, "schedule_mode": schedule_mode,
+    }
+    slot = active_program_slot(program, now)
+    return slot, next_boundary(slots, now, frequency_days, start_date, schedule_mode)
 
 
 def apply_key(program: dict[str, Any], now: datetime) -> str:
@@ -323,9 +378,9 @@ def apply_key(program: dict[str, Any], now: datetime) -> str:
     """
     if not program.get("enabled"):
         return "blocked"
-    if not frequency_allows(program, now):
+    slot = active_program_slot(program, now)
+    if not frequency_allows(program, now) and slot is None:
         return "blocked"
-    slot = active_slot(program["slots"], now)
     return slot["id"] if slot else "off"
 
 
@@ -334,6 +389,7 @@ def next_boundary(
     now: datetime,
     frequency_days: int = 1,
     start_date: str | None = None,
+    schedule_mode: str | None = None,
 ) -> datetime | None:
     """The next local time the schedule changes whether the pump should run."""
     frequency = int(frequency_days or 1)
@@ -342,6 +398,7 @@ def next_boundary(
         "slots": slots,
         "frequency_days": frequency,
         "start_date": start_date,
+        "schedule_mode": schedule_mode,
     }
     anchor = None
     if frequency > 1:
@@ -370,7 +427,7 @@ def next_boundary(
         weekday = day.isoweekday()
         add_candidates(_valid_local_boundaries(day))
         for slot in slots:
-            if weekday in slot["days"]:
+            if schedule_mode == "interval" or weekday in slot["days"]:
                 start = _minute(slot["start"])
                 start_boundary = day + timedelta(minutes=start)
                 resolved_starts = _valid_local_boundaries(start_boundary)
@@ -388,8 +445,8 @@ def next_boundary(
     for candidate, shifted_start in future:
         before_utc = _as_utc(candidate) - timedelta(minutes=1)
         before = before_utc.astimezone(candidate.tzinfo) if candidate.tzinfo else candidate - timedelta(minutes=1)
-        was_running = frequency_allows(program, before) and active_slot(slots, before) is not None
-        will_run = frequency_allows(program, candidate) and active_slot(slots, candidate) is not None
+        was_running = active_program_slot(program, before) is not None
+        will_run = active_program_slot(program, candidate) is not None
         if was_running != will_run:
             return candidate
         # A scheduled start inside a DST gap is moved to the first valid local

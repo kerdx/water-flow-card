@@ -55,11 +55,26 @@ class ValidateProgramTests(unittest.TestCase):
             "frequency_days": 2,
             "start_date": "2026-05-01",
             "auto_entity": "input_boolean.irrigazione_attiva",
+            "schedule_mode": "legacy",
         })
         default = validate_program([], False)
         self.assertEqual(default, {
             "enabled": False, "slots": [], "frequency_days": 1, "start_date": None, "auto_entity": None,
+            "schedule_mode": "weekdays",
         })
+
+    def test_schedule_modes_normalize_new_rules_and_keep_legacy_programs(self):
+        weekdays = validate_program([window()], True, 3, "invalid-but-ignored", schedule_mode="weekdays")
+        self.assertEqual((weekdays["schedule_mode"], weekdays["frequency_days"], weekdays["start_date"]),
+                         ("weekdays", 1, None))
+        self.assertTrue(frequency_allows({**weekdays, "frequency_days": 9, "start_date": "invalid"},
+                                         utc(2026, 5, 4)))
+        interval = validate_program([window(days=[])], True, 2, "2026-05-01", schedule_mode="interval")
+        self.assertEqual(interval["schedule_mode"], "interval")
+        self.assertEqual(interval["slots"][0]["days"], [])
+        with self.assertRaises(ScheduleError) as raised:
+            validate_program([window()], True, 1, schedule_mode="unknown")
+        self.assertEqual(raised.exception.code, "invalid_schedule_mode")
 
     def test_slot_key_shapes_are_exact(self):
         self.assertEqual(SLOT_KEYS, frozenset({"id", "days", "start", "duration"}))
@@ -243,6 +258,21 @@ class EvaluationTests(unittest.TestCase):
         self.assertFalse(frequency_allows(program, anchor - timedelta(days=7)))
         self.assertFalse(frequency_allows({"frequency_days": 3, "start_date": "bad"}, anchor))
         self.assertFalse(frequency_allows({"frequency_days": 3}, anchor))
+
+    def test_interval_mode_ignores_weekdays_and_finishes_overnight_windows(self):
+        interval = validate_program(
+            [window("every-cycle", [], "23:00", 120)], True, 2, "2026-05-04", schedule_mode="interval"
+        )
+        self.assertEqual(apply_key(interval, utc(2026, 5, 4, 23, 30)), "every-cycle")
+        # Tuesday is off-cycle, but the Monday window is allowed to finish.
+        self.assertEqual(apply_key(interval, utc(2026, 5, 5, 0, 30)), "every-cycle")
+        self.assertEqual(apply_key(interval, utc(2026, 5, 5, 1, 0)), "blocked")
+        self.assertEqual(apply_key(interval, utc(2026, 5, 5, 23, 30)), "blocked")
+        self.assertEqual(apply_key(interval, utc(2026, 5, 6, 23, 30)), "every-cycle")
+        self.assertEqual(
+            next_boundary(interval["slots"], utc(2026, 5, 5, 0, 30), 2, "2026-05-04", "interval"),
+            utc(2026, 5, 5, 1, 0),
+        )
 
     def test_apply_key_identifies_the_pump_command(self):
         program = validate_program(self.slots, True)

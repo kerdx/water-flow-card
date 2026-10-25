@@ -1,6 +1,6 @@
 save_program:
   name: Save program
-  description: Create or replace the weekly irrigation program for one switch entity.
+  description: Create or replace the irrigation program for one switch entity.
   fields:
     water_entity:
       name: Pump switch
@@ -17,12 +17,12 @@ save_program:
         boolean:
     slots:
       name: Watering windows
-      description: Weekly windows. Each window requires id, days (1 Monday to 7 Sunday), start (HH:MM) and duration in minutes; liters is optional and only shown by the card.
+      description: Each window requires id, days, start (HH:MM) and duration in minutes; days apply to weekdays and legacy modes. Liters is optional and only shown by the card.
       required: true
       example: '[{"id":"morning","days":[1,2,3,4,5],"start":"05:30","duration":30,"liters":120}]'
     frequency_days:
       name: Frequency
-      description: Water every N days, counted from start_date. 1 waters on every scheduled day.
+      description: In interval mode, repeat every N days from start_date; in legacy mode, gate selected weekdays by the same cycle. 1 means every day.
       required: false
       default: 1
       selector:
@@ -30,6 +30,16 @@ save_program:
           min: 1
           max: 31
           mode: box
+    schedule_mode:
+      name: Schedule mode
+      description: Choose specific weekdays, a repeating every-N-days interval, or legacy combined behavior for existing schedules.
+      required: false
+      selector:
+        select:
+          options:
+            - weekdays
+            - interval
+            - legacy
     start_date:
       name: Frequency anchor date
       description: First day of the every-N-days rhythm, as YYYY-MM-DD. Required when frequency_days is greater than 1.

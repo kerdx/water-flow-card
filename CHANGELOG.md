@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.2.7
+
+- Unify schedule editing with mutually exclusive weekday and every-N-days modes while preserving the combined behavior of existing programs until they are changed.
+- Add configurable valve/device/mode status, daily and real-time volume, duration and irrigation-time readouts, plus dedicated valve and water-shortage protection controls.
+
 ## v1.2.6
 
 - Fix card rendering so new Home Assistant states are reflected instead of leaving stale unavailable values on screen.

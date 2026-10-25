@@ -8,6 +8,7 @@ export const WATER_FLOW_DOMAIN = 'water_flow_scheduler';
 export const MAX_SLOTS = 50;
 export const MAX_DURATION_MINUTES = 1440;
 export const MAX_FREQUENCY_DAYS = 31;
+export const SCHEDULE_MODES = ['weekdays', 'interval', 'legacy'];
 export const CARD_SURFACES = ['default', 'elevated', 'blend'];
 export const CARD_ACTIONS = ['toggle', 'more-info', 'none'];
 export const HAPTIC_STYLES = ['light', 'medium', 'heavy'];
@@ -53,8 +54,38 @@ const STRINGS = {
     windows: 'Windows',
     windowsAria: 'Watering windows',
     frequency: 'Frequency',
+    valve: 'Valve',
+    valveOn: 'Active',
+    valveOff: 'Off',
+    toggleValve: (state) => state === 'on' ? 'Valve active. Tap to turn it off.' : state === 'off' ? 'Valve off. Tap to turn it on.' : 'Valve state unavailable. Tap to toggle the switch.',
+    deviceStatus: 'Device status',
+    deviceStatusNormal: 'Normal',
+    irrigationMode: 'Mode',
+    timedIrrigation: 'Timed cycle',
+    dailyVolume: 'Today',
+    realTimeVolume: 'Current volume',
+    realTimeDuration: 'Duration',
+    irrigationStart: 'Start',
+    irrigationEnd: 'End',
+    shortageProtection: 'Water protection',
+    shortageProtectionOn: 'Enabled',
+    shortageProtectionOff: 'Disabled',
+    toggleShortageProtection: (state) => state === 'on' ? 'Water-shortage protection enabled. Tap to disable.' : state === 'off' ? 'Water-shortage protection disabled. Tap to enable.' : 'Water-shortage protection unavailable. Tap to toggle the switch.',
+    scheduleMode: 'Repeat pattern',
+    weekdayMode: 'Specific weekdays',
+    weekdayModeHelp: 'Water on the selected weekdays every week.',
+    intervalMode: 'Every N days',
+    intervalModeHelp: 'Repeat each watering window on a continuous cycle from a start date.',
+    intervalFrequencyHelp: 'Repeat every watering window every N days from the start date.',
+    legacyFrequencyHelp: 'The schedule checks your selected weekdays on a repeating N-day cycle.',
+    legacyMode: 'Existing combined schedule',
+    legacyModeHelp: 'This saved program combines selected weekdays with an N-day cycle. Choose either new mode to simplify it.',
+    weeklySummary: 'Selected weekdays',
+    legacySummary: (frequency) => `Existing · ${frequency}`,
+    weekdayWindowHelp: 'Choose the weekdays, start time and duration for each window.',
+    intervalWindowHelp: 'Each window repeats on every eligible day in the cycle.',
+    legacyWindowHelp: 'This existing schedule combines selected weekdays with its N-day cycle.',
     battery: (value) => `Battery ${value}`,
-    frequencyHelp: 'The schedule checks your selected weekdays on a repeating N-day cycle.',
     anchorHelp: 'The cycle starts on this date; required when frequency exceeds one day.',
     nextWindow: 'Next: ',
     none: 'none',
@@ -116,6 +147,7 @@ const STRINGS = {
       invalid_duration: 'Duration must be a whole number of minutes between 1 and {max}.',
       invalid_liters: 'Liters must be a finite number greater than zero.',
       invalid_frequency: 'Frequency must be a whole number of days between 1 and {max}.',
+      invalid_schedule_mode: 'Choose either specific weekdays or an every-N-days schedule.',
       invalid_start_date: 'The anchor date must use the YYYY-MM-DD format.',
       frequency_needs_anchor: 'A frequency above one day needs a start date.',
       invalid_auto_entity: 'The auto helper must be an input_boolean entity.',
@@ -148,11 +180,30 @@ const STRINGS = {
       entity: 'Pump switch', name: 'Name', icon: 'Icon', layout: 'Layout',
       accent_color: 'Accent colour', surface: 'Card surface', language: 'Language',
       auto_entity: 'Auto helper', flow_entity: 'Flow sensor', volume_entity: 'Volume sensor', battery_entity: 'Battery sensor',
+      work_state_entity: 'Valve work-state sensor',
+      device_status_entity: 'Device status sensor',
+      irrigation_mode_entity: 'Irrigation mode sensor',
+      timed_irrigation_entity: 'Timed irrigation sensor',
+      daily_volume_entity: 'Daily volume sensor',
+      real_time_volume_entity: 'Real-time volume sensor',
+      real_time_duration_entity: 'Real-time duration sensor',
+      irrigation_start_time_entity: 'Irrigation start-time sensor',
+      irrigation_end_time_entity: 'Irrigation end-time sensor',
+      shortage_protection_entity: 'Water-shortage protection switch',
       program_entity: 'Programs sensor',
       show_state_chip: 'Show pump state', show_flow_chip: 'Show flow',
       show_volume_chip: 'Show volume', show_battery_button: 'Show battery button', show_next_change_chip: 'Show next window',
       show_unavailable_badge: 'Show unavailable badge', show_auto_button: 'Show auto button',
       show_schedule_button: 'Show schedule buttons',
+      show_work_state_button: 'Show valve status and control',
+      show_device_status_chip: 'Show device status',
+      show_irrigation_mode_chip: 'Show irrigation mode',
+      show_timed_irrigation_chip: 'Show timed irrigation status',
+      show_daily_volume_chip: 'Show daily volume',
+      show_real_time_volume_chip: 'Show real-time volume',
+      show_real_time_duration_chip: 'Show real-time duration',
+      show_irrigation_time_chips: 'Show irrigation start and end',
+      show_shortage_protection_button: 'Show water-shortage protection control',
       tap_action: 'Tap action', hold_action: 'Hold action', double_tap_action: 'Double tap action',
       haptics: 'Haptics', haptics_style: 'Haptic style', animations: 'Animations',
       animation_duration: 'Animation duration',
@@ -170,6 +221,16 @@ const STRINGS = {
       flow_entity: 'Flow sensor override; if empty, a matching sensor is detected automatically.',
       volume_entity: 'Volume sensor override; if empty, a matching sensor is detected automatically.',
       battery_entity: 'Battery sensor override; if empty, a matching sensor is detected automatically.',
+      work_state_entity: 'Read-only binary sensor showing whether the valve is working. Its button controls the pump switch.',
+      device_status_entity: 'Optional text sensor that reports the device status.',
+      irrigation_mode_entity: 'Optional text sensor that reports the current irrigation mode.',
+      timed_irrigation_entity: 'Optional text sensor that reports the timed irrigation cycle state.',
+      daily_volume_entity: 'Optional sensor for the total irrigation volume today.',
+      real_time_volume_entity: 'Optional sensor for the current irrigation volume.',
+      real_time_duration_entity: 'Optional sensor for the current irrigation duration.',
+      irrigation_start_time_entity: 'Optional sensor containing the irrigation start timestamp.',
+      irrigation_end_time_entity: 'Optional sensor containing the irrigation end timestamp.',
+      shortage_protection_entity: 'Switch that enables or disables automatic closure when water is scarce.',
       program_entity: 'Diagnostic sensor created by the integration. Leave empty to find it automatically.',
       show_state_chip: 'Watering or off state in the status line.',
       show_flow_chip: 'Current flow chip.',
@@ -179,6 +240,15 @@ const STRINGS = {
       show_unavailable_badge: 'Indicator when the entity is unavailable.',
       show_auto_button: 'Show the Auto sub-button that toggles the auto helper.',
       show_schedule_button: 'Show the Windows and Frequency sub-buttons that open the scheduler.',
+      show_work_state_button: 'Show the configured valve sensor state and a button that toggles the pump switch.',
+      show_device_status_chip: 'Show the configured device status sensor in the status line.',
+      show_irrigation_mode_chip: 'Show the configured irrigation mode sensor in the status line.',
+      show_timed_irrigation_chip: 'Show the configured timed irrigation sensor in the status line.',
+      show_daily_volume_chip: 'Show the configured daily irrigation volume.',
+      show_real_time_volume_chip: 'Show the configured current irrigation volume.',
+      show_real_time_duration_chip: 'Show the configured current irrigation duration.',
+      show_irrigation_time_chips: 'Show start and end times from their timestamp sensors.',
+      show_shortage_protection_button: 'Show a button for the water-shortage protection switch.',
       tap_action: 'What a tap on the card background does.',
       hold_action: 'What a long press on the card background does.',
       double_tap_action: 'What a double tap on the card background does.',
@@ -210,8 +280,38 @@ const STRINGS = {
     windows: 'Orari',
     windowsAria: 'Finestre di irrigazione',
     frequency: 'Frequenza',
+    valve: 'Valvola',
+    valveOn: 'Attiva',
+    valveOff: 'Spenta',
+    toggleValve: (state) => state === 'on' ? 'Valvola attiva. Tocca per disattivarla.' : state === 'off' ? 'Valvola spenta. Tocca per attivarla.' : 'Stato valvola non disponibile. Tocca per commutare lo switch.',
+    deviceStatus: 'Stato dispositivo',
+    deviceStatusNormal: 'Normale',
+    irrigationMode: 'Modalità',
+    timedIrrigation: 'Ciclo temporizzato',
+    dailyVolume: 'Oggi',
+    realTimeVolume: 'Volume attuale',
+    realTimeDuration: 'Durata',
+    irrigationStart: 'Inizio',
+    irrigationEnd: 'Fine',
+    shortageProtection: 'Protezione acqua',
+    shortageProtectionOn: 'Attiva',
+    shortageProtectionOff: 'Disattiva',
+    toggleShortageProtection: (state) => state === 'on' ? 'Protezione carenza acqua attiva. Tocca per disattivarla.' : state === 'off' ? 'Protezione carenza acqua disattiva. Tocca per attivarla.' : 'Protezione carenza acqua non disponibile. Tocca per commutare lo switch.',
+    scheduleMode: 'Modalità di ripetizione',
+    weekdayMode: 'Giorni della settimana',
+    weekdayModeHelp: 'Irriga nei giorni selezionati, ogni settimana.',
+    intervalMode: 'Ogni N giorni',
+    intervalModeHelp: 'Ripete ogni fascia con un ciclo continuo a partire da una data.',
+    intervalFrequencyHelp: 'Ripete ogni fascia ogni N giorni a partire dalla data iniziale.',
+    legacyFrequencyHelp: 'Il programma verifica i giorni selezionati seguendo un ciclo di N giorni.',
+    legacyMode: 'Programma precedente combinato',
+    legacyModeHelp: 'Questo programma combina i giorni selezionati con un ciclo ogni N giorni. Scegli una modalità per semplificarlo.',
+    weeklySummary: 'Giorni selezionati',
+    legacySummary: (frequency) => `Esistente · ${frequency}`,
+    weekdayWindowHelp: 'Scegli i giorni della settimana, l’orario e la durata di ogni fascia.',
+    intervalWindowHelp: 'Ogni fascia si ripete nei giorni previsti dal ciclo.',
+    legacyWindowHelp: 'Questo programma precedente combina i giorni selezionati con il ciclo ogni N giorni.',
     battery: (value) => `Batteria ${value}`,
-    frequencyHelp: 'Il programma verifica i giorni selezionati seguendo un ciclo di N giorni.',
     anchorHelp: 'Il ciclo inizia da questa data; richiesta quando la frequenza supera un giorno.',
     nextWindow: 'Prossimo: ',
     none: 'nessuno',
@@ -270,6 +370,7 @@ const STRINGS = {
       invalid_duration: 'La durata deve essere un numero intero di minuti tra 1 e {max}.',
       invalid_liters: 'I litri devono essere un numero finito maggiore di zero.',
       invalid_frequency: 'La frequenza deve essere un numero intero di giorni tra 1 e {max}.',
+      invalid_schedule_mode: 'Scegli i giorni della settimana oppure la modalità ogni N giorni.',
       invalid_start_date: 'La data di partenza deve usare il formato AAAA-MM-GG.',
       frequency_needs_anchor: 'Una frequenza maggiore di un giorno richiede una data di partenza.',
       invalid_auto_entity: 'L’entità Auto deve essere un input_boolean.',
@@ -303,11 +404,30 @@ const STRINGS = {
       accent_color: 'Colore accento', surface: 'Sfondo card', language: 'Lingua',
       auto_entity: 'Entità Auto', flow_entity: 'Sensore di portata', volume_entity: 'Sensore di volume',
       battery_entity: 'Sensore batteria',
+      work_state_entity: 'Sensore stato di lavoro valvola',
+      device_status_entity: 'Sensore stato dispositivo',
+      irrigation_mode_entity: 'Sensore modalità irrigazione',
+      timed_irrigation_entity: 'Sensore irrigazione temporizzata',
+      daily_volume_entity: 'Sensore volume giornaliero',
+      real_time_volume_entity: 'Sensore volume in tempo reale',
+      real_time_duration_entity: 'Sensore durata in tempo reale',
+      irrigation_start_time_entity: 'Sensore orario inizio irrigazione',
+      irrigation_end_time_entity: 'Sensore orario fine irrigazione',
+      shortage_protection_entity: 'Switch protezione carenza acqua',
       program_entity: 'Sensore programmi',
       show_state_chip: 'Mostra stato pompa', show_flow_chip: 'Mostra portata',
       show_volume_chip: 'Mostra volume', show_battery_button: 'Mostra pulsante batteria', show_next_change_chip: 'Mostra prossimo orario',
       show_unavailable_badge: 'Mostra badge non disponibile', show_auto_button: 'Mostra pulsante Auto',
       show_schedule_button: 'Mostra pulsanti pianificazione',
+      show_work_state_button: 'Mostra stato e controllo valvola',
+      show_device_status_chip: 'Mostra stato dispositivo',
+      show_irrigation_mode_chip: 'Mostra modalità irrigazione',
+      show_timed_irrigation_chip: 'Mostra stato irrigazione temporizzata',
+      show_daily_volume_chip: 'Mostra volume giornaliero',
+      show_real_time_volume_chip: 'Mostra volume in tempo reale',
+      show_real_time_duration_chip: 'Mostra durata in tempo reale',
+      show_irrigation_time_chips: 'Mostra inizio e fine irrigazione',
+      show_shortage_protection_button: 'Mostra controllo protezione carenza acqua',
       tap_action: 'Azione al tocco', hold_action: 'Azione alla pressione lunga', double_tap_action: 'Azione al doppio tocco',
       haptics: 'Feedback tattile', haptics_style: 'Stile feedback', animations: 'Animazioni',
       animation_duration: 'Durata animazione',
@@ -325,6 +445,16 @@ const STRINGS = {
       flow_entity: 'Sensore di portata da preferire; se vuoto, viene rilevato automaticamente.',
       volume_entity: 'Sensore del volume da preferire; se vuoto, viene rilevato automaticamente.',
       battery_entity: 'Sensore batteria da preferire; se vuoto, viene rilevato automaticamente.',
+      work_state_entity: 'Sensore binario di sola lettura che segnala se la valvola è in funzione. Il pulsante comanda lo switch della pompa.',
+      device_status_entity: 'Sensore testuale facoltativo che riporta lo stato del dispositivo.',
+      irrigation_mode_entity: 'Sensore testuale facoltativo che riporta la modalità di irrigazione corrente.',
+      timed_irrigation_entity: 'Sensore testuale facoltativo che riporta lo stato del ciclo di irrigazione temporizzato.',
+      daily_volume_entity: 'Sensore facoltativo del volume totale irrigato oggi.',
+      real_time_volume_entity: 'Sensore facoltativo del volume dell’irrigazione corrente.',
+      real_time_duration_entity: 'Sensore facoltativo della durata dell’irrigazione corrente.',
+      irrigation_start_time_entity: 'Sensore facoltativo con timestamp di inizio irrigazione.',
+      irrigation_end_time_entity: 'Sensore facoltativo con timestamp di fine irrigazione.',
+      shortage_protection_entity: 'Switch che attiva o disattiva la chiusura automatica in caso di carenza d’acqua.',
       program_entity: 'Sensore diagnostico creato dall’integrazione. Lascia vuoto per trovarlo automaticamente.',
       show_state_chip: 'Stato in irrigazione o spenta nella riga di stato.',
       show_flow_chip: 'Chip della portata attuale.',
@@ -334,6 +464,15 @@ const STRINGS = {
       show_unavailable_badge: 'Indicatore quando l’entità non è disponibile.',
       show_auto_button: 'Mostra il sotto-pulsante Auto che commuta l’entità Auto.',
       show_schedule_button: 'Mostra i sotto-pulsanti Orari e Frequenza che aprono la pianificazione.',
+      show_work_state_button: 'Mostra lo stato del sensore valvola configurato e un pulsante che commuta lo switch della pompa.',
+      show_device_status_chip: 'Mostra il sensore stato dispositivo nella riga di stato.',
+      show_irrigation_mode_chip: 'Mostra il sensore modalità irrigazione nella riga di stato.',
+      show_timed_irrigation_chip: 'Mostra il sensore irrigazione temporizzata nella riga di stato.',
+      show_daily_volume_chip: 'Mostra il volume di irrigazione giornaliero configurato.',
+      show_real_time_volume_chip: 'Mostra il volume dell’irrigazione corrente configurato.',
+      show_real_time_duration_chip: 'Mostra la durata dell’irrigazione corrente configurata.',
+      show_irrigation_time_chips: 'Mostra gli orari di inizio e fine dai sensori timestamp.',
+      show_shortage_protection_button: 'Mostra un pulsante per lo switch di protezione carenza acqua.',
       tap_action: 'Cosa fa un tocco sullo sfondo della card.',
       hold_action: 'Cosa fa una pressione lunga sullo sfondo della card.',
       double_tap_action: 'Cosa fa un doppio tocco sullo sfondo della card.',
@@ -418,6 +557,18 @@ export const chipValue = (state, locale) => {
   return unit ? `${number} ${unit}` : number;
 };
 
+export const timestampClock = (value, locale) => {
+  const timestamp = numeric(value);
+  if (timestamp === null || timestamp <= 0) return null;
+  const date = new Date(timestamp > 1e12 ? timestamp : timestamp * 1000);
+  if (!Number.isFinite(date.getTime())) return null;
+  try {
+    return new Intl.DateTimeFormat(locale || 'en', { hour: '2-digit', minute: '2-digit' }).format(date);
+  } catch {
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  }
+};
+
 const entityTokens = (entityId, state, extraName = '') => new Set(
   `${entityId?.split('.')?.[1] || ''} ${state?.attributes?.friendly_name || ''} ${extraName || ''}`
     .toLowerCase()
@@ -484,6 +635,7 @@ export const sessionMinutes = (nowMs, startedMs) => {
 // Frequency rhythm: run only on days whose distance from the anchor is a
 // multiple of frequency_days, exactly like frequency_allows() in the backend.
 export const frequencyAllows = (program, nowMs = Date.now()) => {
+  if (program?.schedule_mode === 'weekdays') return true;
   const days = numeric(program?.frequency_days) ?? 1;
   if (days <= 1) return true;
   const anchor = program?.start_date;
@@ -498,15 +650,41 @@ export const frequencyAllows = (program, nowMs = Date.now()) => {
 
 const isoWeekday = (date) => (date.getDay() === 0 ? 7 : date.getDay());
 
-export const activeSlotFor = (slots, weekday, minute) => {
+export const activeSlotFor = (slots, weekday, minute, scheduleMode = 'legacy') => {
   for (const slot of Array.isArray(slots) ? slots : []) {
     const start = timeMinutes(slot?.start);
-    if (start === null || !Array.isArray(slot.days)) continue;
+    if (start === null || (!Array.isArray(slot.days) && scheduleMode !== 'interval')) continue;
     const duration = numeric(slot.duration) ?? 0;
     // Before the start time the window that covers this minute began yesterday.
     const coveringWeekday = minute >= start ? weekday : (weekday - 2 + 7) % 7 + 1;
-    if (!slot.days.includes(coveringWeekday)) continue;
+    if (scheduleMode !== 'interval' && !slot.days.includes(coveringWeekday)) continue;
     if (((minute - start) % 1440 + 1440) % 1440 < duration) return slot;
+  }
+  return null;
+};
+
+const activeScheduleSlot = (program, timestamp) => {
+  const now = new Date(timestamp);
+  const mode = program?.schedule_mode || 'legacy';
+  const weekday = isoWeekday(now);
+  const minute = now.getHours() * 60 + now.getMinutes();
+  if (mode === 'interval') {
+    const currentEligible = frequencyAllows(program, timestamp);
+    const previousDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 12).getTime();
+    const previousEligible = frequencyAllows(program, previousDay);
+    for (const slot of Array.isArray(program?.slots) ? program.slots : []) {
+      const start = timeMinutes(slot?.start);
+      const duration = numeric(slot?.duration) ?? 0;
+      if (start === null) continue;
+      const startedToday = minute >= start;
+      if (startedToday ? !currentEligible : !previousEligible) continue;
+      const elapsed = startedToday ? minute - start : 1440 - start + minute;
+      if (elapsed < duration) return slot;
+    }
+    return null;
+  }
+  if (frequencyAllows(program, timestamp)) {
+    return activeSlotFor(program?.slots, weekday, minute, mode);
   }
   return null;
 };
@@ -530,6 +708,8 @@ export const isValidDate = (value) => {
   return parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day;
 };
 
+export const localDateString = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
 const gcd = (a, b) => (b ? gcd(b, a % b) : a);
 
 export const nextWindowMs = (slots, nowMs = Date.now(), program = null) => {
@@ -537,8 +717,9 @@ export const nextWindowMs = (slots, nowMs = Date.now(), program = null) => {
   if (!list.length) return null;
   const now = new Date(nowMs);
   const frequency = numeric(program?.frequency_days) ?? 1;
-  if (frequency > 1 && !isValidDate(program?.start_date)) return null;
-  const cycleDays = frequency > 1 ? (7 * frequency) / gcd(7, frequency) : 7;
+  const mode = program?.schedule_mode || 'legacy';
+  if (mode !== 'weekdays' && frequency > 1 && !isValidDate(program?.start_date)) return null;
+  const cycleDays = mode === 'weekdays' ? 7 : frequency > 1 ? (7 * frequency) / gcd(7, frequency) : 7;
   const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
   const match = frequency > 1 ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(program.start_date) : null;
   const anchorUtc = match ? Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : todayUtc;
@@ -553,13 +734,13 @@ export const nextWindowMs = (slots, nowMs = Date.now(), program = null) => {
     for (const slot of list) {
       const start = timeMinutes(slot?.start);
       const duration = numeric(slot.duration) ?? 0;
-      if (start === null || !Array.isArray(slot.days) || !slot.days.includes(weekday)) continue;
+      if (start === null || (mode !== 'interval' && (!Array.isArray(slot.days) || !slot.days.includes(weekday)))) continue;
       candidates.push(new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, start).getTime());
       candidates.push(new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, start + duration).getTime());
     }
   }
   const wantsWater = (timestamp) => {
-    if (program && !frequencyAllows(program, timestamp)) return false;
+    if (program) return Boolean(activeScheduleSlot(program, timestamp));
     const date = new Date(timestamp);
     return Boolean(activeSlotFor(list, isoWeekday(date), date.getHours() * 60 + date.getMinutes()));
   };
@@ -573,13 +754,13 @@ export const activeProgram = (program, nowMs = Date.now()) => {
   }
   const now = new Date(nowMs);
   const frequencyOk = frequencyAllows(program, nowMs);
-  const slot = frequencyOk ? activeSlotFor(program.slots, isoWeekday(now), now.getHours() * 60 + now.getMinutes()) : null;
+  const slot = activeScheduleSlot(program, nowMs);
   return {
     enabled: true,
     running: Boolean(slot),
     slot,
     slotId: slot ? slot.id : null,
-    frequencyOk,
+    frequencyOk: frequencyOk || Boolean(slot),
     nextChangeMs: nextWindowMs(program.slots, nowMs, program),
   };
 };
@@ -617,8 +798,24 @@ export const pumpStateLabel = (state, strings) => {
   return String(value);
 };
 
+export const workStateLabel = (state, strings) => {
+  const value = typeof state === 'object' ? state?.state : state;
+  if (value === 'on') return strings.valveOn;
+  if (value === 'off') return strings.valveOff;
+  return strings.unavailable;
+};
+
+export const deviceStatusLabel = (state, strings) => {
+  if (state === 'normal_state') return strings.deviceStatusNormal;
+  if (state === 'unknown' || state === 'unavailable' || state === null || state === undefined || state === '') {
+    return strings.unavailable;
+  }
+  return String(state);
+};
+
 export const emptyScheduleDraft = () => ({
   enabled: false,
+  schedule_mode: 'weekdays',
   frequency_days: 1,
   start_date: '',
   auto_entity: '',
@@ -636,6 +833,10 @@ export const nextSlotId = (slots = []) => {
 
 export const scheduleDraft = (program) => {
   if (!program || typeof program !== 'object') return emptyScheduleDraft();
+  const frequency = numeric(program.frequency_days) ?? 1;
+  const scheduleMode = SCHEDULE_MODES.includes(program.schedule_mode)
+    ? program.schedule_mode
+    : frequency > 1 ? 'legacy' : 'weekdays';
   const slots = Array.isArray(program.slots)
     ? program.slots.map((slot, index) => ({
         id: slot?.id || `window-${index + 1}`,
@@ -647,7 +848,8 @@ export const scheduleDraft = (program) => {
     : [slotDraft()];
   return {
     enabled: program.enabled === true,
-    frequency_days: numeric(program.frequency_days) ?? 1,
+    schedule_mode: scheduleMode,
+    frequency_days: frequency,
     start_date: typeof program.start_date === 'string' && program.start_date ? program.start_date : '',
     auto_entity: typeof program.auto_entity === 'string' ? program.auto_entity : '',
     slots,
@@ -664,12 +866,14 @@ export const validateScheduleDraft = (draft) => {
   if (!Array.isArray(draft.slots)) return fail('invalid_slots');
   if (draft.slots.length > MAX_SLOTS) return fail('too_many_slots', { max: MAX_SLOTS });
   if (draft.enabled && !draft.slots.length) return fail('empty_enabled_program');
+  const mode = SCHEDULE_MODES.includes(draft.schedule_mode) ? draft.schedule_mode : null;
+  if (!mode) return fail('invalid_schedule_mode');
   const frequency = numeric(draft.frequency_days);
-  if (frequency === null || !Number.isInteger(frequency) || frequency < 1 || frequency > MAX_FREQUENCY_DAYS) {
+  if (mode !== 'weekdays' && (frequency === null || !Number.isInteger(frequency) || frequency < 1 || frequency > MAX_FREQUENCY_DAYS)) {
     return fail('invalid_frequency', { max: MAX_FREQUENCY_DAYS });
   }
-  if (draft.start_date && !isValidDate(draft.start_date)) return fail('invalid_start_date');
-  if (frequency > 1 && !draft.start_date) return fail('frequency_needs_anchor');
+  if (mode !== 'weekdays' && draft.start_date && !isValidDate(draft.start_date)) return fail('invalid_start_date');
+  if (mode !== 'weekdays' && frequency > 1 && !draft.start_date) return fail('frequency_needs_anchor');
   if (draft.auto_entity && !/^input_boolean\.[A-Za-z0-9_]+$/.test(draft.auto_entity)) return fail('invalid_auto_entity');
   const ids = new Set();
   const occupied = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [] };
@@ -683,7 +887,7 @@ export const validateScheduleDraft = (draft) => {
     if (typeof slot.id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(slot.id)) return fail('invalid_slot_id');
     if (ids.has(slot.id)) return fail('duplicate_slot_id', { id: slot.id });
     ids.add(slot.id);
-    if (!Array.isArray(slot.days) || !slot.days.length || slot.days.some((day) => !Number.isInteger(day) || day < 1 || day > 7)) {
+    if (!Array.isArray(slot.days) || (mode !== 'interval' && !slot.days.length) || slot.days.some((day) => !Number.isInteger(day) || day < 1 || day > 7)) {
       return fail('invalid_days');
     }
     if (new Set(slot.days).size !== slot.days.length) return fail('duplicate_days');
@@ -697,7 +901,8 @@ export const validateScheduleDraft = (draft) => {
       if (liters === null || liters <= 0) return fail('invalid_liters');
     }
     const start = timeMinutes(slot.start);
-    for (const day of [...new Set(slot.days)]) {
+    const validationDays = mode === 'interval' ? [1, 2, 3, 4, 5, 6, 7] : [...new Set(slot.days)];
+    for (const day of validationDays) {
       const intervals = start + duration > 1440
         ? [[day, start, 1440], [day === 7 ? 1 : day + 1, 0, start + duration - 1440]]
         : [[day, start, start + duration]];
@@ -713,6 +918,10 @@ export const validateScheduleDraft = (draft) => {
 };
 
 export const programPayload = (waterEntity, draft) => {
+  const scheduleMode = SCHEDULE_MODES.includes(draft.schedule_mode)
+    ? draft.schedule_mode
+    : numeric(draft.frequency_days) > 1 ? 'legacy' : 'weekdays';
+  const frequencyDays = scheduleMode === 'weekdays' ? 1 : Number(draft.frequency_days) || 1;
   const slots = (draft.slots || []).map((slot, index) => {
     const payload = {
       id: slot.id || `window-${index + 1}`,
@@ -727,9 +936,10 @@ export const programPayload = (waterEntity, draft) => {
   return {
     water_entity: waterEntity,
     enabled: draft.enabled === true,
+    schedule_mode: scheduleMode,
     slots,
-    frequency_days: Number(draft.frequency_days) || 1,
-    ...(draft.frequency_days > 1 || draft.start_date ? { start_date: draft.start_date || null } : {}),
+    frequency_days: frequencyDays,
+    ...(scheduleMode !== 'weekdays' && (frequencyDays > 1 || draft.start_date) ? { start_date: draft.start_date || null } : {}),
     ...(draft.auto_entity ? { auto_entity: draft.auto_entity } : {}),
   };
 };
@@ -769,6 +979,15 @@ const defaultCardConfig = (entity = 'switch.irrigazione') => ({
   show_unavailable_badge: true,
   show_auto_button: true,
   show_schedule_button: true,
+  show_work_state_button: true,
+  show_device_status_chip: true,
+  show_irrigation_mode_chip: true,
+  show_timed_irrigation_chip: true,
+  show_daily_volume_chip: true,
+  show_real_time_volume_chip: true,
+  show_real_time_duration_chip: true,
+  show_irrigation_time_chips: true,
+  show_shortage_protection_button: true,
 });
 export { defaultCardConfig };
 
@@ -831,10 +1050,20 @@ export const configSchema = [
     field('flow_entity', { entity: { filter: { domain: ['sensor'] } } }),
     field('volume_entity', { entity: { filter: { domain: ['sensor'] } } }),
     field('battery_entity', { entity: { filter: { domain: ['sensor'] } } }),
+    field('work_state_entity', { entity: { filter: { domain: ['binary_sensor'] } } }),
+    field('device_status_entity', { entity: { filter: { domain: ['sensor'] } } }),
+    field('irrigation_mode_entity', { entity: { filter: { domain: ['sensor'] } } }),
+    field('timed_irrigation_entity', { entity: { filter: { domain: ['sensor'] } } }),
+    field('daily_volume_entity', { entity: { filter: { domain: ['sensor'] } } }),
+    field('real_time_volume_entity', { entity: { filter: { domain: ['sensor'] } } }),
+    field('real_time_duration_entity', { entity: { filter: { domain: ['sensor'] } } }),
+    field('irrigation_start_time_entity', { entity: { filter: { domain: ['sensor'] } } }),
+    field('irrigation_end_time_entity', { entity: { filter: { domain: ['sensor'] } } }),
+    field('shortage_protection_entity', { entity: { filter: { domain: ['switch'] } } }),
     field('program_entity', { entity: { filter: { domain: ['sensor'] } } }),
   ]),
   grid('visible', [
-    ...['show_state_chip', 'show_flow_chip', 'show_volume_chip', 'show_battery_button', 'show_next_change_chip', 'show_unavailable_badge', 'show_auto_button', 'show_schedule_button']
+    ...['show_state_chip', 'show_flow_chip', 'show_volume_chip', 'show_battery_button', 'show_next_change_chip', 'show_unavailable_badge', 'show_auto_button', 'show_schedule_button', 'show_work_state_button', 'show_device_status_chip', 'show_irrigation_mode_chip', 'show_timed_irrigation_chip', 'show_daily_volume_chip', 'show_real_time_volume_chip', 'show_real_time_duration_chip', 'show_irrigation_time_chips', 'show_shortage_protection_button']
       .map((name) => field(name, { boolean: {} })),
   ]),
   expandable('controls', [
@@ -895,9 +1124,9 @@ const CARD_CSS = `
   .battery-button:hover{background:var(--water-flow-accent-color);border-color:var(--water-flow-accent-color);color:var(--text-primary-color,#fff);box-shadow:0 0 0 3px color-mix(in srgb,var(--water-flow-accent-color) 24%,transparent);transform:translateY(-1px)}
   .battery-button:active{transform:scale(.96);filter:brightness(.9)}
   .battery-button:focus-visible,.round:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
-  .subrow{display:flex;gap:8px;padding:0 14px 14px}
+  .subrow{display:flex;flex-wrap:wrap;gap:8px;padding:0 14px 14px}
   .compact .subrow{padding:0 12px 12px}
-  .sub{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 8px;border-radius:12px;border:1px solid var(--divider-color);background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sub{flex:1 1 120px;min-width:0;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 8px;border-radius:12px;border:1px solid var(--divider-color);background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .sub ha-icon{--mdc-icon-size:16px;flex:0 0 auto}
   .sub .sub-label{overflow:hidden;text-overflow:ellipsis}
   .sub[data-active="true"]{background:color-mix(in srgb, var(--water-flow-accent-color) 22%, transparent);border-color:color-mix(in srgb, var(--water-flow-accent-color) 55%, transparent);color:var(--water-flow-accent-color)}
@@ -947,6 +1176,24 @@ const CARD_CSS = `
   .input[aria-invalid="true"],ha-entity-picker[aria-invalid="true"]{border-color:var(--error-color)}
   .input.num{width:96px;text-align:right}
   .field-stack{display:flex;flex-direction:column;gap:12px;padding:14px 0;border-bottom:1px solid var(--divider-color);scroll-margin:10px}
+  .mode-picker{display:flex;flex-direction:column;gap:9px}
+  .mode-picker-title{font-size:13px;font-weight:650;color:var(--primary-text-color)}
+  .mode-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .mode-card{min-width:0;min-height:76px;display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--divider-color);border-radius:14px;background:var(--secondary-background-color);color:var(--primary-text-color);text-align:left;font:inherit;cursor:pointer;transition:background .18s,border-color .18s,box-shadow .18s,transform .18s}
+  .mode-card:hover{border-color:color-mix(in srgb,var(--water-flow-accent-color) 55%,var(--divider-color));transform:translateY(-1px)}
+  .mode-card[data-selected="true"]{border-color:var(--water-flow-accent-color);background:color-mix(in srgb,var(--water-flow-accent-color) 10%,var(--secondary-background-color));box-shadow:inset 0 0 0 1px var(--water-flow-accent-color)}
+  .mode-card:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
+  .mode-icon{--mdc-icon-size:21px;flex:0 0 auto;color:var(--secondary-text-color)}
+  .mode-card[data-selected="true"] .mode-icon{color:var(--water-flow-accent-color)}
+  .mode-copy{display:flex;flex:1 1 auto;min-width:0;flex-direction:column;gap:3px}
+  .mode-copy strong{font-size:12px;font-weight:700}
+  .mode-copy small{font-size:11px;line-height:1.35;color:var(--secondary-text-color)}
+  .mode-check{--mdc-icon-size:18px;flex:0 0 auto;color:var(--water-flow-accent-color);opacity:0}
+  .mode-card[data-selected="true"] .mode-check{opacity:1}
+  [hidden]{display:none!important}
+  .legacy-note{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--warning-color,#ed9b00) 35%,var(--divider-color));border-radius:12px;background:color-mix(in srgb,var(--warning-color,#ed9b00) 7%,var(--secondary-background-color));color:var(--secondary-text-color);font-size:12px;line-height:1.4}
+  .legacy-note ha-icon{--mdc-icon-size:17px;flex:0 0 auto;color:var(--warning-color,#ed9b00)}
+  .legacy-note[hidden]{display:none}
   .switch{position:relative;width:42px;height:24px;flex:0 0 auto}
   .switch input{appearance:none;-webkit-appearance:none;position:absolute;inset:0;margin:0;border-radius:999px;background:var(--divider-color);border:0;cursor:pointer;transition:background .2s}
   .switch input:after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--text-primary-color,#fff);transition:transform .2s}
@@ -993,7 +1240,7 @@ const CARD_CSS = `
   .btn.danger{color:var(--error-color);border-color:color-mix(in srgb, var(--error-color) 45%, transparent);background:transparent}
   .btn:focus-visible,.slot-remove:focus-visible,.close:focus-visible,.add:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
   ha-entity-picker{flex:1 1 190px;max-width:280px;min-width:0}
-  @media(max-width:520px){dialog{max-width:calc(100vw - 16px);border-radius:18px}.dlg-head{padding:16px 16px 10px}.dlg-summary{margin:0 16px 12px;padding:12px}.dlg-body{padding:0 16px 14px;gap:14px}.dlg-foot{padding:10px 16px max(12px,env(safe-area-inset-bottom))}.week-overview{gap:4px}.week-day{min-height:52px}.week-day small{font-size:8px}.slot-grid label{flex:1 1 110px}.dlg-actions{align-items:stretch}.dlg-actions-right{margin-left:auto}}
+  @media(max-width:520px){dialog{max-width:calc(100vw - 16px);border-radius:18px}.dlg-head{padding:16px 16px 10px}.dlg-summary{margin:0 16px 12px;padding:12px}.dlg-body{padding:0 16px 14px;gap:14px}.dlg-foot{padding:10px 16px max(12px,env(safe-area-inset-bottom))}.week-overview{gap:4px}.week-day{min-height:52px}.week-day small{font-size:8px}.mode-grid{grid-template-columns:1fr}.mode-card{min-height:68px}.slot-grid label{flex:1 1 110px}.dlg-actions{align-items:stretch}.dlg-actions-right{margin-left:auto}}
   @media(prefers-reduced-motion:reduce){.day,.btn,.add{transition:none}.btn:not(:disabled):hover{transform:none}}
   .preview{pointer-events:none}
 `;
@@ -1083,6 +1330,40 @@ export class WaterFlowCard extends HTMLElementBase {
     if (Object.hasOwn(next, 'haptics_style')) {
       if (!HAPTIC_STYLES.includes(next.haptics_style)) throw new Error(`haptics_style must be one of ${HAPTIC_STYLES.join(', ')}`);
     }
+    const workStateEntity = next.work_state_entity;
+    if (workStateEntity !== undefined && workStateEntity !== null && workStateEntity !== ''
+      && (typeof workStateEntity !== 'string' || !workStateEntity.startsWith('binary_sensor.'))) {
+      throw new Error('work_state_entity must be a binary_sensor entity');
+    }
+    const deviceStatusEntity = next.device_status_entity;
+    if (deviceStatusEntity !== undefined && deviceStatusEntity !== null && deviceStatusEntity !== ''
+      && (typeof deviceStatusEntity !== 'string' || !deviceStatusEntity.startsWith('sensor.'))) {
+      throw new Error('device_status_entity must be a sensor entity');
+    }
+    const irrigationModeEntity = next.irrigation_mode_entity;
+    if (irrigationModeEntity !== undefined && irrigationModeEntity !== null && irrigationModeEntity !== ''
+      && (typeof irrigationModeEntity !== 'string' || !irrigationModeEntity.startsWith('sensor.'))) {
+      throw new Error('irrigation_mode_entity must be a sensor entity');
+    }
+    const timedIrrigationEntity = next.timed_irrigation_entity;
+    if (timedIrrigationEntity !== undefined && timedIrrigationEntity !== null && timedIrrigationEntity !== ''
+      && (typeof timedIrrigationEntity !== 'string' || !timedIrrigationEntity.startsWith('sensor.'))) {
+      throw new Error('timed_irrigation_entity must be a sensor entity');
+    }
+    for (const [fieldName, domain] of [
+      ['daily_volume_entity', 'sensor'],
+      ['real_time_volume_entity', 'sensor'],
+      ['real_time_duration_entity', 'sensor'],
+      ['irrigation_start_time_entity', 'sensor'],
+      ['irrigation_end_time_entity', 'sensor'],
+      ['shortage_protection_entity', 'switch'],
+    ]) {
+      const value = next[fieldName];
+      if (value !== undefined && value !== null && value !== ''
+        && (typeof value !== 'string' || !value.startsWith(`${domain}.`))) {
+        throw new Error(`${fieldName} must be a ${domain} entity`);
+      }
+    }
     if (Object.hasOwn(next, 'animation_duration')) next.animation_duration = normalizeAnimationDuration(next.animation_duration);
     this.config = next;
     if (entityChanged) this._syncSessionTracking();
@@ -1164,6 +1445,22 @@ export class WaterFlowCard extends HTMLElementBase {
       const sensor = this._hass?.states?.[entityId];
       return [entityId, sensor?.state, sensor?.attributes?.unit_of_measurement];
     });
+    const workStateEntity = this.config?.work_state_entity;
+    const workState = workStateEntity ? this._hass?.states?.[workStateEntity] : null;
+    const deviceStatusEntity = this.config?.device_status_entity;
+    const deviceStatus = deviceStatusEntity ? this._hass?.states?.[deviceStatusEntity] : null;
+    const irrigationModeEntity = this.config?.irrigation_mode_entity;
+    const irrigationMode = irrigationModeEntity ? this._hass?.states?.[irrigationModeEntity] : null;
+    const timedIrrigationEntity = this.config?.timed_irrigation_entity;
+    const timedIrrigation = timedIrrigationEntity ? this._hass?.states?.[timedIrrigationEntity] : null;
+    const supplementalStates = [
+      'daily_volume_entity', 'real_time_volume_entity', 'real_time_duration_entity',
+      'irrigation_start_time_entity', 'irrigation_end_time_entity', 'shortage_protection_entity',
+    ].map((fieldName) => {
+      const entityId = this.config?.[fieldName];
+      const entityState = entityId ? this._hass?.states?.[entityId] : null;
+      return [fieldName, entityId, entityState?.state, entityState?.attributes?.unit_of_measurement];
+    });
     return JSON.stringify([
       this.config,
       state?.state,
@@ -1171,6 +1468,11 @@ export class WaterFlowCard extends HTMLElementBase {
       this._hass?.locale?.language ?? this._hass?.language ?? null,
       auto?.state,
       readoutStates,
+      workStateEntity ? [workStateEntity, workState?.state] : null,
+      deviceStatusEntity ? [deviceStatusEntity, deviceStatus?.state] : null,
+      irrigationModeEntity ? [irrigationModeEntity, irrigationMode?.state] : null,
+      timedIrrigationEntity ? [timedIrrigationEntity, timedIrrigation?.state] : null,
+      supplementalStates,
       program,
       this._sessionMinute,
       this._dialogError,
@@ -1217,6 +1519,28 @@ export class WaterFlowCard extends HTMLElementBase {
     const volumeEntity = this._sensorEntity('volume_entity', 'volume');
     const batteryEntity = this._sensorEntity('battery_entity', 'battery');
     const batteryState = batteryEntity ? this._hass?.states?.[batteryEntity] : null;
+    const workStateEntity = typeof config.work_state_entity === 'string' ? config.work_state_entity : '';
+    const workState = workStateEntity ? this._hass?.states?.[workStateEntity] : null;
+    const workStateValue = workState?.state;
+    const workStateText = workStateLabel(workStateValue, strings);
+    const deviceStatusEntity = typeof config.device_status_entity === 'string' ? config.device_status_entity : '';
+    const deviceStatus = deviceStatusEntity ? this._hass?.states?.[deviceStatusEntity] : null;
+    const irrigationModeEntity = typeof config.irrigation_mode_entity === 'string' ? config.irrigation_mode_entity : '';
+    const irrigationMode = irrigationModeEntity ? this._hass?.states?.[irrigationModeEntity] : null;
+    const timedIrrigationEntity = typeof config.timed_irrigation_entity === 'string' ? config.timed_irrigation_entity : '';
+    const timedIrrigation = timedIrrigationEntity ? this._hass?.states?.[timedIrrigationEntity] : null;
+    const dailyVolumeEntity = typeof config.daily_volume_entity === 'string' ? config.daily_volume_entity : '';
+    const dailyVolume = dailyVolumeEntity ? this._hass?.states?.[dailyVolumeEntity] : null;
+    const realTimeVolumeEntity = typeof config.real_time_volume_entity === 'string' ? config.real_time_volume_entity : '';
+    const realTimeVolume = realTimeVolumeEntity ? this._hass?.states?.[realTimeVolumeEntity] : null;
+    const realTimeDurationEntity = typeof config.real_time_duration_entity === 'string' ? config.real_time_duration_entity : '';
+    const realTimeDuration = realTimeDurationEntity ? this._hass?.states?.[realTimeDurationEntity] : null;
+    const startTimeEntity = typeof config.irrigation_start_time_entity === 'string' ? config.irrigation_start_time_entity : '';
+    const startTimeState = startTimeEntity ? this._hass?.states?.[startTimeEntity] : null;
+    const endTimeEntity = typeof config.irrigation_end_time_entity === 'string' ? config.irrigation_end_time_entity : '';
+    const endTimeState = endTimeEntity ? this._hass?.states?.[endTimeEntity] : null;
+    const shortageProtectionEntity = typeof config.shortage_protection_entity === 'string' ? config.shortage_protection_entity : '';
+    const shortageProtection = shortageProtectionEntity ? this._hass?.states?.[shortageProtectionEntity] : null;
     const status = state?.state;
     const unavailable = status === 'unavailable' || status === 'unknown';
     const statusView = activeProgram(program, Date.now());
@@ -1235,6 +1559,22 @@ export class WaterFlowCard extends HTMLElementBase {
     if (config.show_state_chip !== false) {
       chips.push(`<span class="state-chip${running ? ' live' : ''}" data-state="${esc(status || 'unavailable')}">${esc(stateLabel)}</span>`);
     }
+    if (config.show_device_status_chip !== false && deviceStatusEntity) {
+      const statusText = deviceStatusLabel(deviceStatus?.state, strings);
+      chips.push(`<span class="device-status-chip" title="${esc(strings.deviceStatus)}">${esc(strings.deviceStatus)} · ${esc(statusText)}</span>`);
+    }
+    if (config.show_irrigation_mode_chip !== false && irrigationModeEntity) {
+      const modeText = irrigationMode?.state === 'unknown' || irrigationMode?.state === 'unavailable'
+        ? strings.unavailable
+        : irrigationMode?.state ?? strings.unavailable;
+      chips.push(`<span class="irrigation-mode-chip" title="${esc(strings.irrigationMode)}">${esc(strings.irrigationMode)} · ${esc(modeText)}</span>`);
+    }
+    if (config.show_timed_irrigation_chip !== false && timedIrrigationEntity) {
+      const timedText = timedIrrigation?.state === 'unknown' || timedIrrigation?.state === 'unavailable'
+        ? strings.unavailable
+        : timedIrrigation?.state ?? strings.unavailable;
+      chips.push(`<span class="timed-irrigation-chip" title="${esc(strings.timedIrrigation)}">${esc(strings.timedIrrigation)} · ${esc(timedText)}</span>`);
+    }
     if (unavailable && config.show_unavailable_badge !== false) {
       // The badge is separate from the state chip: it stays visible even when
       // the state chip is switched off, which is the point of the option.
@@ -1252,6 +1592,26 @@ export class WaterFlowCard extends HTMLElementBase {
       const value = chipValue(this._hass?.states?.[volumeEntity], locale);
       if (value !== null) chips.push(`<span>${esc(strings.volume(value))}</span>`);
     }
+    if (config.show_daily_volume_chip !== false && dailyVolumeEntity) {
+      const value = chipValue(dailyVolume, locale);
+      if (value !== null) chips.push(`<span class="daily-volume-chip">${esc(strings.dailyVolume)} · ${esc(value)}</span>`);
+    }
+    if (config.show_real_time_volume_chip !== false && realTimeVolumeEntity) {
+      const value = chipValue(realTimeVolume, locale);
+      if (value !== null) chips.push(`<span class="real-time-volume-chip">${esc(strings.realTimeVolume)} · ${esc(value)}</span>`);
+    }
+    if (config.show_real_time_duration_chip !== false && realTimeDurationEntity) {
+      const value = chipValue(realTimeDuration, locale);
+      if (value !== null) chips.push(`<span class="real-time-duration-chip">${esc(strings.realTimeDuration)} · ${esc(value)}</span>`);
+    }
+    if (config.show_irrigation_time_chips !== false && startTimeEntity) {
+      const value = timestampClock(startTimeState?.state, locale) || strings.unavailable;
+      chips.push(`<span class="irrigation-start-chip">${esc(strings.irrigationStart)} · ${esc(value)}</span>`);
+    }
+    if (config.show_irrigation_time_chips !== false && endTimeEntity) {
+      const value = timestampClock(endTimeState?.state, locale) || strings.unavailable;
+      chips.push(`<span class="irrigation-end-chip">${esc(strings.irrigationEnd)} · ${esc(value)}</span>`);
+    }
     if (config.show_next_change_chip !== false && program) {
       const next = statusView.nextChangeMs ? new Date(statusView.nextChangeMs) : null;
       chips.push(`<span>${esc(strings.nextWindow + (next ? `${String(next.getHours()).padStart(2, '0')}:${String(next.getMinutes()).padStart(2, '0')}` : strings.none))}</span>`);
@@ -1260,7 +1620,7 @@ export class WaterFlowCard extends HTMLElementBase {
     const title = esc(cardTitle(config, this._hass));
     const icon = esc(config.icon || 'mdi:water-pump');
     const autoLabel = auto ? (auto.state === 'on' ? strings.autoOn : strings.autoOff) : strings.noAuto;
-    const frequency = program ? frequencyLabel(program.frequency_days, strings) : strings.none;
+    const frequency = program ? scheduleSummaryLabel(program, strings) : strings.none;
     const activeSlotId = statusView.slotId;
     const activeWindowIndex = Array.isArray(program?.slots) && activeSlotId
       ? program.slots.findIndex((slot) => slot.id === activeSlotId)
@@ -1271,6 +1631,17 @@ export class WaterFlowCard extends HTMLElementBase {
         ? (() => { const next = new Date(statusView.nextChangeMs); return `${String(next.getHours()).padStart(2, '0')}:${String(next.getMinutes()).padStart(2, '0')}`; })()
         : strings.none;
     const subRow = [];
+    if (config.show_shortage_protection_button !== false && shortageProtectionEntity) {
+      const active = shortageProtection?.state === 'on';
+      const protectionText = active ? strings.shortageProtectionOn
+        : shortageProtection?.state === 'off' ? strings.shortageProtectionOff : strings.unavailable;
+      const toggleLabel = strings.toggleShortageProtection(shortageProtection?.state);
+      subRow.push(`<button class="sub" type="button" data-act="shortage-protection" data-active="${active}" aria-pressed="${active}" aria-label="${esc(toggleLabel)}" title="${esc(toggleLabel)}"><ha-icon icon="mdi:water-alert"></ha-icon><span class="sub-label">${esc(`${strings.shortageProtection} · ${protectionText}`)}</span></button>`);
+    }
+    if (config.show_work_state_button !== false && workStateEntity) {
+      const active = workStateValue === 'on';
+      subRow.push(`<button class="sub" type="button" data-act="work-toggle" data-active="${active}" aria-pressed="${active}" aria-label="${esc(strings.toggleValve(workStateValue))}" title="${esc(strings.toggleValve(workStateValue))}"><ha-icon icon="mdi:valve"></ha-icon><span class="sub-label">${esc(`${strings.valve} · ${workStateText}`)}</span></button>`);
+    }
     if (config.show_auto_button !== false && autoEntity) {
       subRow.push(`<button class="sub" type="button" data-act="auto" data-active="${auto?.state === 'on'}" aria-pressed="${auto?.state === 'on'}" title="${esc(autoLabel)}"><ha-icon icon="mdi:calendar-check"></ha-icon><span class="sub-label">${esc(strings.auto)}</span></button>`);
     }
@@ -1319,6 +1690,8 @@ export class WaterFlowCard extends HTMLElementBase {
       if (act === 'card') { this._cardAction(); return; }
       if (act === 'auto') { this._toggleAuto(); return; }
       if (act === 'battery') { this._batteryAction(); return; }
+      if (act === 'work-toggle') { this._toggleWorkState(); return; }
+      if (act === 'shortage-protection') { this._toggleShortageProtection(); return; }
       if (act === 'schedule') { this._scheduleOpener = target; this.openSchedule(target.dataset.focus || 'slots'); return; }
     });
     root.addEventListener('keydown', (event) => {
@@ -1353,6 +1726,23 @@ export class WaterFlowCard extends HTMLElementBase {
     fireHaptic(this.config.haptics !== false, this.config.haptics_style);
     const call = toggleAutoCall(auto);
     this._service(call.domain, call.service, call.data);
+  }
+
+  _toggleWorkState() {
+    if (!this.config?.work_state_entity || this.config.show_work_state_button === false) return Promise.resolve();
+    const call = actionCall('toggle', this.config.entity);
+    this._clearCardServiceError();
+    fireHaptic(this.config.haptics !== false, this.config.haptics_style);
+    return this._service(call.domain, call.service, call.data);
+  }
+
+  _toggleShortageProtection() {
+    const entity = this.config?.shortage_protection_entity;
+    if (!entity || this.config.show_shortage_protection_button === false) return Promise.resolve();
+    const call = actionCall('toggle', entity);
+    this._clearCardServiceError();
+    fireHaptic(this.config.haptics !== false, this.config.haptics_style);
+    return this._service(call.domain, call.service, call.data);
   }
 
   _batteryAction() {
@@ -1429,6 +1819,7 @@ export class WaterFlowCard extends HTMLElementBase {
     const strings = this._strings();
     const draft = this._draft || (this._draft = scheduleDraft(this._program()));
     const program = this._program();
+    const mode = draft.schedule_mode;
     const backendError = program?.last_error ? errorLabel(program.last_error, strings) : '';
     dialog.setAttribute('aria-label', strings.scheduleTitle);
     dialog.innerHTML = `
@@ -1441,7 +1832,7 @@ export class WaterFlowCard extends HTMLElementBase {
         </div>
         <div class="dlg-summary" aria-live="polite">
           <div class="summary-copy">
-            <strong data-role="summary-frequency">${esc(frequencyLabel(draft.frequency_days, strings))}</strong>
+            <strong data-role="summary-frequency">${esc(scheduleSummaryLabel(draft, strings))}</strong>
             <small data-role="summary-count">${esc(strings.windowCount(draft.slots.length))}</small>
           </div>
           <span class="status-pill" data-role="program-status" data-enabled="${draft.enabled}">${esc(draft.enabled ? strings.activeProgram : strings.pausedProgram)}</span>
@@ -1453,11 +1844,23 @@ export class WaterFlowCard extends HTMLElementBase {
               <div><label for="wf-enabled">${esc(strings.scheduleEnabled)}</label><div class="hint" id="wf-enabled-help">${esc(strings.scheduleEnabledHelp)}</div></div>
               <span class="switch"><input id="wf-enabled" type="checkbox" role="switch" aria-describedby="wf-enabled-help" data-field="enabled" ${draft.enabled ? 'checked' : ''}></span>
             </div>
-            <div class="row-field">
-              <div><label for="wf-frequency">${esc(strings.frequency)}</label><div class="hint" id="wf-frequency-help">${esc(strings.frequencyHelp)}</div></div>
+            <div class="mode-picker">
+              <div class="mode-picker-title">${esc(strings.scheduleMode)}</div>
+              ${mode === 'legacy' ? `<div class="legacy-note" role="note"><ha-icon icon="mdi:information-outline"></ha-icon><span>${esc(strings.legacyModeHelp)}</span></div>` : ''}
+              <div class="mode-grid" role="group" aria-label="${esc(strings.scheduleMode)}">
+                <button class="mode-card" type="button" data-act="set-mode" data-mode="weekdays" data-selected="${mode === 'weekdays'}" aria-pressed="${mode === 'weekdays'}">
+                  <ha-icon class="mode-icon" icon="mdi:calendar-week"></ha-icon><span class="mode-copy"><strong>${esc(strings.weekdayMode)}</strong><small>${esc(strings.weekdayModeHelp)}</small></span><ha-icon class="mode-check" icon="mdi:check-circle"></ha-icon>
+                </button>
+                <button class="mode-card" type="button" data-act="set-mode" data-mode="interval" data-selected="${mode === 'interval'}" aria-pressed="${mode === 'interval'}">
+                  <ha-icon class="mode-icon" icon="mdi:calendar-sync"></ha-icon><span class="mode-copy"><strong>${esc(strings.intervalMode)}</strong><small>${esc(strings.intervalModeHelp)}</small></span><ha-icon class="mode-check" icon="mdi:check-circle"></ha-icon>
+                </button>
+              </div>
+            </div>
+            <div class="row-field" data-role="frequency-row" ${mode === 'weekdays' ? 'hidden' : ''}>
+              <div><label for="wf-frequency">${esc(strings.frequency)}</label><div class="hint" id="wf-frequency-help" data-role="frequency-help">${esc(frequencyHelpForMode(mode, strings))}</div></div>
               <input class="input num" id="wf-frequency" type="number" min="1" max="${MAX_FREQUENCY_DAYS}" step="1" aria-describedby="wf-frequency-help" data-field="frequency_days" value="${esc(draft.frequency_days)}">
             </div>
-            <div class="row-field" data-role="anchor-row" ${Number(draft.frequency_days) > 1 ? '' : 'hidden'}>
+            <div class="row-field" data-role="anchor-row" ${mode !== 'weekdays' && Number(draft.frequency_days) > 1 ? '' : 'hidden'}>
               <div><label for="wf-anchor">${esc(strings.anchor)}</label><div class="hint" id="wf-anchor-help">${esc(strings.anchorHelp || '')}</div></div>
               <input class="input" id="wf-anchor" type="date" aria-describedby="wf-anchor-help" data-field="start_date" value="${esc(draft.start_date)}">
             </div>
@@ -1466,13 +1869,13 @@ export class WaterFlowCard extends HTMLElementBase {
               <ha-entity-picker id="wf-auto" data-field="auto_entity" aria-describedby="wf-auto-help"></ha-entity-picker>
             </div>
           </section>
-          <div class="week-overview-wrap">
+          <div class="week-overview-wrap" data-role="weekly-overview-wrap" ${mode === 'interval' ? 'hidden' : ''}>
             <div class="week-overview-title">${esc(strings.weekOverview)}</div>
             <div data-role="weekly-overview">${this._weeklyOverviewMarkup(strings)}</div>
           </div>
           <section class="dlg-section" id="wf-windows" tabindex="-1" aria-labelledby="wf-windows-title">
             <div class="dlg-section-head">
-              <div><h3 id="wf-windows-title">${esc(strings.windowsAria)}</h3><p>${esc(strings.windowSectionHelp || '')}</p></div>
+              <div><h3 id="wf-windows-title">${esc(strings.windowsAria)}</h3><p data-role="window-help">${esc(windowHelpForMode(mode, strings))}</p></div>
               <span class="window-count" data-role="window-count">${esc(strings.windowCountLimit(draft.slots.length, MAX_SLOTS))}</span>
             </div>
             <div class="slots">${draft.slots.map((slot, index) => this._slotMarkup(slot, index, strings)).join('')}</div>
@@ -1529,13 +1932,14 @@ export class WaterFlowCard extends HTMLElementBase {
   }
 
   _slotMarkup(slot, index, strings) {
+    const daysHidden = this._draft?.schedule_mode === 'interval' ? 'hidden' : '';
     return `
       <div class="slot" data-slot="${index}" role="group" aria-labelledby="wf-slot-title-${index}">
         <div class="slot-head">
           <div><strong id="wf-slot-title-${index}">${esc(strings.window(index + 1))}</strong><div class="hint slot-meta">${esc(`${slot.start} · ${formatDuration(slot.duration, strings)}`)}</div></div>
           <button class="slot-remove" type="button" data-act="remove-slot" data-slot="${index}" aria-label="${esc(strings.removeWindow(index + 1))}">${esc(strings.removeWindow(index + 1))}</button>
         </div>
-        <div class="days" role="group" aria-label="${esc(strings.selectWindowDays(index + 1))}">
+        <div class="days" role="group" aria-label="${esc(strings.selectWindowDays(index + 1))}" ${daysHidden}>
           ${strings.dayPills.map((label, dayIndex) => {
             const day = dayIndex + 1;
             const pressed = slot.days.includes(day);
@@ -1597,6 +2001,10 @@ export class WaterFlowCard extends HTMLElementBase {
       input.focus();
       return;
     }
+    if (action === 'set-mode') {
+      this._setScheduleMode(target.dataset.mode);
+      return;
+    }
     if (action === 'add-slot') {
       if (draft.slots.length >= MAX_SLOTS) return;
       const slot = slotDraft();
@@ -1637,6 +2045,21 @@ export class WaterFlowCard extends HTMLElementBase {
     if (action === 'save') { this._saveDraft(); return; }
   }
 
+  _setScheduleMode(mode) {
+    const draft = this._draft;
+    if (!draft || this._busy || !['weekdays', 'interval'].includes(mode) || draft.schedule_mode === mode) return;
+    draft.schedule_mode = mode;
+    if (mode === 'weekdays') {
+      draft.frequency_days = 1;
+      draft.start_date = '';
+    } else {
+      if (!isValidDate(draft.start_date)) draft.start_date = localDateString();
+    }
+    this._clearDialogValidation();
+    this._refreshWeeklyOverview();
+    this._renderDialogState();
+  }
+
   _refreshSlots(focusIndex = null) {
     const container = this._dialog?.querySelector('.slots');
     if (!container) return;
@@ -1644,7 +2067,10 @@ export class WaterFlowCard extends HTMLElementBase {
     this._refreshWeeklyOverview();
     this._renderDialogState();
     if (focusIndex !== null && focusIndex >= 0) {
-      this._dialog.querySelector(`.slot[data-slot="${focusIndex}"] .day`)?.focus?.();
+      const focusTarget = this._draft.schedule_mode === 'interval'
+        ? this._dialog.querySelector(`.slot[data-slot="${focusIndex}"] [data-slot-field="start"]`)
+        : this._dialog.querySelector(`.slot[data-slot="${focusIndex}"] .day`);
+      focusTarget?.focus?.();
       this._dialog.querySelector(`.slot[data-slot="${focusIndex}"]`)?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
     } else if (!this._draft.slots.length) {
       this._dialog.querySelector('[data-act="add-slot"]')?.focus?.();
@@ -1658,7 +2084,7 @@ export class WaterFlowCard extends HTMLElementBase {
 
   _focusScheduleSection(focus = 'slots') {
     const target = focus === 'frequency'
-      ? this._dialog?.querySelector('[data-field="frequency_days"]')
+      ? this._dialog?.querySelector(this._draft?.schedule_mode === 'weekdays' ? '[data-act="set-mode"][data-mode="interval"]' : '[data-field="frequency_days"]')
       : this._dialog?.querySelector('#wf-windows');
     if (!target) return;
     target.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
@@ -1689,17 +2115,31 @@ export class WaterFlowCard extends HTMLElementBase {
     const status = dialog.querySelector('[data-role="program-status"]');
     const windowCount = dialog.querySelector('[data-role="window-count"]');
     const anchorRow = dialog.querySelector('[data-role="anchor-row"]');
+    const frequencyRow = dialog.querySelector('[data-role="frequency-row"]');
+    const frequencyHelp = dialog.querySelector('[data-role="frequency-help"]');
+    const overviewWrap = dialog.querySelector('[data-role="weekly-overview-wrap"]');
+    const windowHelp = dialog.querySelector('[data-role="window-help"]');
     const empty = dialog.querySelector('[data-role="empty-windows"]');
     const add = dialog.querySelector('[data-act="add-slot"]');
     const feedback = dialog.querySelector('[data-role="dialog-feedback"]');
-    if (frequency) frequency.textContent = frequencyLabel(draft.frequency_days, strings);
+    if (frequency) frequency.textContent = scheduleSummaryLabel(draft, strings);
     if (count) count.textContent = strings.windowCount(draft.slots.length);
     if (status) {
       status.textContent = draft.enabled ? strings.activeProgram : strings.pausedProgram;
       status.dataset.enabled = String(draft.enabled);
     }
     if (windowCount) windowCount.textContent = strings.windowCountLimit(draft.slots.length, MAX_SLOTS);
-    if (anchorRow) anchorRow.hidden = !(Number(draft.frequency_days) > 1);
+    if (frequencyRow) frequencyRow.hidden = draft.schedule_mode === 'weekdays';
+    if (frequencyHelp) frequencyHelp.textContent = frequencyHelpForMode(draft.schedule_mode, strings);
+    if (anchorRow) anchorRow.hidden = draft.schedule_mode === 'weekdays' || !(Number(draft.frequency_days) > 1);
+    if (overviewWrap) overviewWrap.hidden = draft.schedule_mode === 'interval';
+    if (windowHelp) windowHelp.textContent = windowHelpForMode(draft.schedule_mode, strings);
+    for (const button of dialog.querySelectorAll('[data-act="set-mode"]')) {
+      const selected = button.dataset.mode === draft.schedule_mode;
+      button.dataset.selected = String(selected);
+      button.setAttribute('aria-pressed', String(selected));
+    }
+    for (const days of dialog.querySelectorAll('.days')) days.hidden = draft.schedule_mode === 'interval';
     if (empty) empty.hidden = draft.slots.length > 0;
     if (add) add.disabled = this._busy || draft.slots.length >= MAX_SLOTS;
     if (feedback) {
@@ -1893,6 +2333,26 @@ export class WaterFlowCard extends HTMLElementBase {
 }
 
 export const frequencyLabel = (days, strings) => strings.everyDays(numeric(days) ?? 1);
+
+export const scheduleSummaryLabel = (program, strings) => {
+  const frequency = numeric(program?.frequency_days) ?? 1;
+  const mode = SCHEDULE_MODES.includes(program?.schedule_mode)
+    ? program.schedule_mode
+    : frequency > 1 ? 'legacy' : 'weekdays';
+  if (mode === 'weekdays') return strings.weeklySummary;
+  const interval = frequencyLabel(frequency, strings);
+  return mode === 'legacy' ? strings.legacySummary(interval) : interval;
+};
+
+const windowHelpForMode = (mode, strings) => {
+  if (mode === 'interval') return strings.intervalWindowHelp;
+  if (mode === 'legacy') return strings.legacyWindowHelp;
+  return strings.weekdayWindowHelp;
+};
+
+const frequencyHelpForMode = (mode, strings) => mode === 'interval'
+  ? strings.intervalFrequencyHelp
+  : mode === 'legacy' ? strings.legacyFrequencyHelp : strings.intervalFrequencyHelp;
 
 const EDITOR_CSS = `
   :host{display:block;color:var(--primary-text-color);font-family:var(--paper-font-body1_-_font-family,inherit)}

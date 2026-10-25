@@ -30,6 +30,7 @@ from .schedule import (
     program_status,
     release_action,
     restore_entity_state,
+    SCHEDULE_MODES,
     snapshot_entity_state,
     structured_error,
     validate_program,
@@ -116,6 +117,7 @@ class Scheduler:
                     raw.get("frequency_days", 1),
                     raw.get("start_date"),
                     raw.get("auto_entity"),
+                    raw.get("schedule_mode"),
                 )
                 self.programs[entity_id] = program
                 self.errors[entity_id] = raw.get("last_error")
@@ -157,12 +159,13 @@ class Scheduler:
                 now,
                 program["frequency_days"],
                 program["start_date"],
+                program["schedule_mode"],
             )
             result[entity_id] = {
                 **program,
                 "active_slot_id": slot["id"] if slot else None,
                 "next_change": boundary.isoformat() if boundary else None,
-                "frequency_ok": frequency_allows(program, now),
+                "frequency_ok": frequency_allows(program, now) or slot is not None,
                 "auto_on": self._auto_is_on(program),
                 "last_error": self.errors.get(entity_id),
             }
@@ -222,9 +225,10 @@ class Scheduler:
         frequency_days: Any = 1,
         start_date: Any = None,
         auto_entity: Any = None,
+        schedule_mode: Any = None,
     ) -> None:
         try:
-            program = validate_program(slots, enabled, frequency_days, start_date, auto_entity)
+            program = validate_program(slots, enabled, frequency_days, start_date, auto_entity, schedule_mode)
             if enabled:
                 state = self.hass.states.get(entity_id)
                 if state is None:
@@ -472,6 +476,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: Any) -> bool:
         vol.Optional("frequency_days", default=1): int,
         vol.Optional("start_date"): vol.Any(None, str),
         vol.Optional("auto_entity"): vol.Any(None, str),
+        vol.Optional("schedule_mode"): vol.In(SCHEDULE_MODES),
     })
     enabled_schema = vol.Schema({vol.Required("water_entity"): schema_entity, vol.Required("enabled"): _strict_bool})
     delete_schema = vol.Schema({vol.Required("water_entity"): schema_entity})
@@ -485,6 +490,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: Any) -> bool:
                 call.data.get("frequency_days", 1),
                 call.data.get("start_date"),
                 call.data.get("auto_entity"),
+                call.data.get("schedule_mode"),
             )
         except ScheduleValidationError as err:
             entity = call.data.get("water_entity")
