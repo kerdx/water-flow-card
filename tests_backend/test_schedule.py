@@ -27,6 +27,7 @@ frequency_allows = schedule.frequency_allows
 migrate_storage_data = schedule.migrate_storage_data
 next_boundary = schedule.next_boundary
 program_status = schedule.program_status
+release_action = schedule.release_action
 restore_entity_state = schedule.restore_entity_state
 snapshot_entity_state = schedule.snapshot_entity_state
 structured_error = schedule.structured_error
@@ -258,6 +259,35 @@ class EvaluationTests(unittest.TestCase):
         slot, boundary = program_status(self.slots, True, utc(2026, 5, 4, 5, 45))
         self.assertEqual(slot["id"], "morning")
         self.assertIsInstance(boundary, datetime)
+
+    def test_program_status_and_forecast_skip_ineligible_frequency_days(self):
+        slots = [
+            window("tuesday", [2], "05:00", 30),
+            window("wednesday", [3], "05:00", 30),
+        ]
+        # The Tuesday window is not actionable: the 2-day cycle is anchored Monday.
+        slot, boundary = program_status(slots, True, utc(2026, 5, 5, 5, 15), 2, "2026-05-04")
+        self.assertIsNone(slot)
+        self.assertEqual(boundary, utc(2026, 5, 6, 5, 0))
+        # On Monday the forecast also skips Tuesday and points to Wednesday.
+        self.assertEqual(
+            next_boundary(slots, utc(2026, 5, 4, 6, 0), 2, "2026-05-04"),
+            utc(2026, 5, 6, 5, 0),
+        )
+
+    def test_releasing_an_owned_program_turns_off_an_on_pump(self):
+        enabled = {"enabled": True}
+        disabled = {"enabled": False}
+        self.assertEqual(release_action(enabled, "on", True), "turn_off")
+        self.assertIsNone(release_action(enabled, "off", True))
+        # Auto-off deliberately returns the pump to manual ownership untouched.
+        self.assertIsNone(release_action(enabled, "on", False))
+        self.assertIsNone(release_action(disabled, "on", True))
+        self.assertIsNone(release_action(None, "on", True))
+        for state in (None, "unknown", "unavailable"):
+            with self.subTest(state=state), self.assertRaises(ScheduleError) as raised:
+                release_action(enabled, state, True)
+            self.assertEqual(raised.exception.code, "cannot_release_control")
 
     def test_next_boundary_returns_the_next_local_change(self):
         now = utc(2026, 5, 4, 5, 45)

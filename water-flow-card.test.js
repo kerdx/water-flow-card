@@ -11,7 +11,7 @@ import {
   normalizeLayout, normalizeCardAction, normalizeHapticStyle, normalizeAnimationDuration,
   CARD_SURFACES, CARD_ACTIONS, HAPTIC_STYLES, ANIMATION_DURATION_DEFAULT, MAX_SLOTS, MAX_DURATION_MINUTES,
   MAX_FREQUENCY_DAYS, WATER_FLOW_DOMAIN, numeric, formatNumber, formatDuration, chipValue, sessionMinutes,
-  pumpStateLabel, cardTitle, frequencyAllows, activeSlotFor, activeProgram, nextWindowMs, timeMinutes,
+  pumpStateLabel, cardTitle, frequencyAllows, activeSlotFor, activeProgram, nextWindowMs, timeMinutes, stepScheduleValue,
   programSensor, programOf, scheduleDraft, emptyScheduleDraft, validateScheduleDraft, programPayload,
   deleteProgramPayload, actionCall, toggleAutoCall, hapticPattern, fireHaptic,
 } from './custom_components/water_flow_scheduler/www/water-flow-card.js';
@@ -285,6 +285,30 @@ test('frequency rhythm follows the anchor date', () => {
   assert.equal(frequencyAllows(null, anchor), true);
 });
 
+test('frequency-aware status and forecast skip off-cycle windows', () => {
+  const slots = [
+    { id: 'tuesday', days: [2], start: '05:00', duration: 30 },
+    { id: 'wednesday', days: [3], start: '05:00', duration: 30 },
+  ];
+  const program = { enabled: true, frequency_days: 2, start_date: '2026-05-04', slots };
+  const monday = new Date(2026, 4, 4, 6, 0).getTime();
+  const tuesday = new Date(2026, 4, 5, 5, 15).getTime();
+  assert.equal(activeProgram(program, tuesday).running, false);
+  assert.equal(activeProgram(program, tuesday).slotId, null);
+  assert.equal(new Date(nextWindowMs(slots, monday, program)).getTime(), new Date(2026, 4, 6, 5, 0).getTime());
+});
+
+test('duration and liters steppers clamp and preserve optional liters', () => {
+  assert.equal(stepScheduleValue(30, 'duration', 1), 31);
+  assert.equal(stepScheduleValue(30.5, 'duration', 1), 31);
+  assert.equal(stepScheduleValue(1, 'duration', -1), 1);
+  assert.equal(stepScheduleValue(MAX_DURATION_MINUTES, 'duration', 1), MAX_DURATION_MINUTES);
+  assert.equal(stepScheduleValue('120.5', 'liters', 1), '121.5');
+  assert.equal(stepScheduleValue('1', 'liters', -1), '');
+  assert.equal(stepScheduleValue('', 'liters', 1), '1');
+  assert.equal(stepScheduleValue('4', 'other', 1), '4');
+});
+
 test('active window detection covers normal and past-midnight windows', () => {
   assert.equal(timeMinutes('05:30'), 330);
   assert.equal(timeMinutes('23:59'), 1439);
@@ -371,6 +395,9 @@ test('card markup renders state, readouts and the three sub-buttons', () => {
   assert.match(html, /data-act="schedule" data-focus="slots"/);
   assert.match(html, /data-act="schedule" data-focus="frequency"/);
   assert.match(html, /Ogni 2 giorni/);
+  assert.match(html, /role="button" tabindex="0" data-act="card"/);
+  assert.match(html, /data-act="schedule" data-focus="slots" aria-label=/);
+  assert.match(html, /class="row-content"[^]*<\/div>\s*<div class="side">/);
   assert.match(html, /mdi:water-pump/);
   // The card never injects unescaped entity names.
   assert.ok(!html.includes('<script'));
@@ -380,6 +407,53 @@ test('card markup renders state, readouts and the three sub-buttons', () => {
   assert.match(englishHtml, /Watering/);
   assert.ok(!englishHtml.includes('data-act="auto"'));
   assert.ok(!englishHtml.includes('Ogni'));
+});
+
+test('schedule duration and liters use visible, localized accessible steppers', () => {
+  const card = configuredCard(defaultCardConfig('switch.irrigazione'));
+  card._hass = fakeHass();
+  card._draft = scheduleDraft({ slots: [{ id: 'morning', days: [1], start: '05:30', duration: 30, liters: '120' }] });
+  const english = card._slotMarkup(card._draft.slots[0], 0, cardStrings('en'));
+  assert.match(english, /data-slot-field="duration" data-direction="1" aria-label="Increase Duration \(minutes\) for window 1"/);
+  assert.match(english, /data-slot-field="liters" data-direction="-1" aria-label="Decrease Liters for window 1"/);
+  assert.match(english, /aria-controls="wf-slot-0-duration"/);
+  assert.match(english, /aria-controls="wf-slot-0-liters"/);
+  const italian = card._slotMarkup(card._draft.slots[0], 0, cardStrings('it'));
+  assert.match(italian, /Aumenta Durata \(minuti\) per la fascia 1/);
+  assert.match(italian, /Riduci Litri per la fascia 1/);
+});
+
+test('card keyboard action is isolated from sibling schedule controls', () => {
+  const card = configuredCard(defaultCardConfig('switch.irrigazione'));
+  const listeners = {};
+  card.shadowRoot = { addEventListener: (name, callback) => { listeners[name] = callback; } };
+  let actions = 0;
+  let schedules = 0;
+  card._cardAction = () => { actions += 1; };
+  card.openSchedule = () => { schedules += 1; };
+  card._bindCardEvents();
+
+  const scheduleButton = {
+    dataset: { act: 'schedule', focus: 'slots' },
+    closest: (selector) => selector === '[data-act]' ? scheduleButton : null,
+  };
+  listeners.click({ target: scheduleButton });
+  let prevented = false;
+  listeners.keydown({
+    key: 'Enter', target: scheduleButton,
+    preventDefault: () => { prevented = true; },
+  });
+  assert.equal(schedules, 1);
+  assert.equal(actions, 0);
+  assert.equal(prevented, false);
+
+  const cardButton = {
+    dataset: { act: 'card' },
+    closest: (selector) => selector === '[data-act="card"]' ? cardButton : null,
+  };
+  listeners.keydown({ key: ' ', target: cardButton, preventDefault: () => { prevented = true; } });
+  assert.equal(actions, 1);
+  assert.equal(prevented, true);
 });
 
 test('unavailable badge follows its own option and never hides the state line', () => {
@@ -420,6 +494,52 @@ test('card markup surfaces the backend last_error with a localized message', () 
   assert.match(card._cardMarkup(), /Le finestre morning e evening si sovrappongono\./);
   programs['switch.irrigazione'].last_error = { code: 'brand_new_code', context: {}, message: 'raw failure' };
   assert.match(card._cardMarkup(), /raw failure/);
+});
+
+test('manual service failures render an accessible card error without a prior backend error', async () => {
+  const card = configuredCard(defaultCardConfig('switch.irrigazione'));
+  card._hass = fakeHass({ callService: async () => { throw new Error('pump command failed'); } });
+  await card._service('switch', 'turn_on', { entity_id: 'switch.irrigazione' });
+  assert.match(card._cardMarkup(), /role="alert">Servizio non riuscito: pump command failed/);
+});
+
+test('session duration uses last_changed and advances on its ticker', () => {
+  const previous = {
+    window: Object.getOwnPropertyDescriptor(globalThis, 'window'),
+    setInterval: Object.getOwnPropertyDescriptor(globalThis, 'setInterval'),
+    clearInterval: Object.getOwnPropertyDescriptor(globalThis, 'clearInterval'),
+    now: Object.getOwnPropertyDescriptor(Date, 'now'),
+  };
+  let now = 1_120_000;
+  let tick;
+  let intervalMs;
+  let cleared;
+  Object.defineProperty(globalThis, 'window', { value: {}, configurable: true });
+  Object.defineProperty(globalThis, 'setInterval', { value: (callback, ms) => { tick = callback; intervalMs = ms; return 17; }, configurable: true });
+  Object.defineProperty(globalThis, 'clearInterval', { value: (id) => { cleared = id; }, configurable: true });
+  Object.defineProperty(Date, 'now', { value: () => now, configurable: true });
+  try {
+    const card = configuredCard(defaultCardConfig('switch.irrigazione'));
+    card._renderIfChanged = () => {};
+    const lastChanged = new Date(1_000_000).toISOString();
+    card.hass = fakeHass({ states: { ...states, 'switch.irrigazione': { state: 'on', last_changed: lastChanged, attributes: {} } } });
+    assert.equal(card._sessionStartMs, Date.parse(lastChanged));
+    assert.equal(card._sessionMinute, 2);
+    assert.equal(intervalMs, 15000);
+    now += 60_000;
+    tick();
+    assert.equal(card._sessionMinute, 3);
+    card.disconnectedCallback();
+    assert.equal(cleared, 17);
+  } finally {
+    for (const [key, descriptor] of Object.entries(previous)) {
+      if (key === 'now') {
+        if (descriptor) Object.defineProperty(Date, 'now', descriptor);
+        else delete Date.now;
+      } else if (descriptor) Object.defineProperty(globalThis, key === 'window' ? 'window' : key, descriptor);
+      else delete globalThis[key];
+    }
+  }
 });
 
 test('service wrapper consumes rejections and reports them accessibly', async () => {

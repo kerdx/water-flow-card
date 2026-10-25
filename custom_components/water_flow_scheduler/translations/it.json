@@ -80,6 +80,9 @@
     "entity_unavailable": {
       "message": "L'entità switch non è disponibile; il comando alla pompa è in attesa."
     },
+    "cannot_release_control": {
+      "message": "Impossibile cedere il controllo del pianificatore perché lo switch non è disponibile."
+    },
     "service_call_failed": {
       "message": "La chiamata al servizio switch non è riuscita: {message}"
     },

@@ -80,6 +80,9 @@
     "entity_unavailable": {
       "message": "The switch entity is unavailable; the pump command is pending."
     },
+    "cannot_release_control": {
+      "message": "Scheduler control could not be released because the switch is unavailable."
+    },
     "service_call_failed": {
       "message": "The switch service call failed: {message}"
     },

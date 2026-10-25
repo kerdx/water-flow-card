@@ -28,6 +28,7 @@ from .schedule import (
     frequency_allows,
     migrate_storage_data,
     program_status,
+    release_action,
     restore_entity_state,
     snapshot_entity_state,
     structured_error,
@@ -150,7 +151,13 @@ class Scheduler:
         now = dt_util.now()
         result: dict[str, dict[str, Any]] = {}
         for entity_id, program in self.programs.items():
-            slot, boundary = program_status(program["slots"], program["enabled"], now)
+            slot, boundary = program_status(
+                program["slots"],
+                program["enabled"],
+                now,
+                program["frequency_days"],
+                program["start_date"],
+            )
             result[entity_id] = {
                 **program,
                 "active_slot_id": slot["id"] if slot else None,
@@ -184,6 +191,29 @@ class Scheduler:
             return False
         return True
 
+    async def _stop_before_releasing(self, entity_id: str, program: dict[str, Any] | None) -> None:
+        """Turn off a pump the scheduler currently owns before releasing it."""
+        state = self.hass.states.get(entity_id)
+        try:
+            action = release_action(
+                program,
+                state.state if state else None,
+                self._auto_is_on(program) if program else False,
+            )
+        except ScheduleError as err:
+            raise ScheduleValidationError(str(err), code=err.code, context=err.context) from err
+        if action is None:
+            return
+        try:
+            await self.hass.services.async_call(
+                "switch", action, {"entity_id": entity_id}, blocking=True
+            )
+        except Exception as err:
+            raise ScheduleValidationError(
+                f"Could not turn off switch before releasing scheduler control: {err}",
+                code="service_call_failed",
+            ) from err
+
     async def async_set_program(
         self,
         entity_id: str,
@@ -213,6 +243,14 @@ class Scheduler:
             snapshot = self._snapshot_entity(entity_id)
             try:
                 previous = self.programs.get(entity_id)
+                relinquishing = bool(
+                    previous
+                    and previous["enabled"]
+                    and self._auto_is_on(previous)
+                    and (not program["enabled"] or not self._auto_is_on(program))
+                )
+                if relinquishing:
+                    await self._stop_before_releasing(entity_id, previous)
                 self.programs[entity_id] = program
                 if previous != program:
                     # A replaced program starts from an unknown pump command,
@@ -236,6 +274,8 @@ class Scheduler:
                 raise ScheduleValidationError("No schedule exists for this switch entity", code="no_program")
             snapshot = self._snapshot_entity(entity_id)
             try:
+                if not enabled:
+                    await self._stop_before_releasing(entity_id, self.programs[entity_id])
                 self.programs[entity_id]["enabled"] = enabled
                 self.errors[entity_id] = None
                 self._last_logged_error.pop(entity_id, None)
@@ -253,6 +293,7 @@ class Scheduler:
         async with self._evaluation_lock:
             snapshot = self._snapshot_entity(entity_id)
             try:
+                await self._stop_before_releasing(entity_id, self.programs.get(entity_id))
                 self.programs.pop(entity_id, None)
                 self.errors.pop(entity_id, None)
                 self.pending.discard(entity_id)

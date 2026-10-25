@@ -13,6 +13,21 @@ export const CARD_ACTIONS = ['toggle', 'more-info', 'none'];
 export const HAPTIC_STYLES = ['light', 'medium', 'heavy'];
 export const ANIMATION_DURATION_DEFAULT = 220;
 
+export const stepScheduleValue = (value, field, direction) => {
+  if (!Number.isFinite(direction) || ![-1, 1].includes(direction)) return value;
+  const current = numeric(value);
+  if (field === 'duration') {
+    const base = Number.isInteger(current) ? current : Math.trunc(current ?? 0);
+    return Math.max(1, Math.min(MAX_DURATION_MINUTES, base + direction));
+  }
+  if (field === 'liters') {
+    if (current === null) return direction > 0 ? '1' : '';
+    const next = current + direction;
+    return next <= 0 ? '' : String(Number(next.toFixed(6)));
+  }
+  return value;
+};
+
 // Card UI strings. The active language follows hass.locale.language; languages
 // other than Italian fall back to English.
 const STRINGS = {
@@ -62,6 +77,8 @@ const STRINGS = {
     duration: 'Duration (minutes)',
     liters: 'Liters',
     litersHelp: 'Optional target shown by the card.',
+    increaseValue: (field, index) => `Increase ${field} for window ${index}`,
+    decreaseValue: (field, index) => `Decrease ${field} for window ${index}`,
     weekOverview: 'Weekly overview',
     noWateringDay: 'No watering',
     windowCount: (count) => `${count} ${count === 1 ? 'window' : 'windows'}`,
@@ -116,6 +133,7 @@ const STRINGS = {
       unknown_water_entity: 'Unknown switch entity: {entity}.',
       unknown_auto_entity: 'Unknown auto entity: {entity}.',
       entity_unavailable: 'The switch entity is unavailable; the pump command is pending.',
+      cannot_release_control: 'Scheduler control could not be released because the switch is unavailable.',
       service_call_failed: 'The switch service call failed: {message}',
       unexpected_failure: 'Scheduler error: {message}',
     },
@@ -213,6 +231,8 @@ const STRINGS = {
     duration: 'Durata (minuti)',
     liters: 'Litri',
     litersHelp: 'Obiettivo facoltativo mostrato dalla card.',
+    increaseValue: (field, index) => `Aumenta ${field} per la fascia ${index}`,
+    decreaseValue: (field, index) => `Riduci ${field} per la fascia ${index}`,
     weekOverview: 'Riepilogo settimanale',
     noWateringDay: 'Nessuna irrigazione',
     windowCount: (count) => `${count} ${count === 1 ? 'fascia' : 'fasce'}`,
@@ -264,6 +284,7 @@ const STRINGS = {
       unknown_water_entity: 'Entità switch sconosciuta: {entity}.',
       unknown_auto_entity: 'Entità auto sconosciuta: {entity}.',
       entity_unavailable: 'L’entità switch non è disponibile; il comando alla pompa è in attesa.',
+      cannot_release_control: 'Impossibile cedere il controllo del pianificatore perché lo switch non è disponibile.',
       service_call_failed: 'La chiamata al servizio switch non è riuscita: {message}',
       unexpected_failure: 'Errore del pianificatore: {message}',
     },
@@ -454,14 +475,26 @@ export const isValidDate = (value) => {
   return parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day;
 };
 
-export const nextWindowMs = (slots, nowMs = Date.now()) => {
+const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+
+export const nextWindowMs = (slots, nowMs = Date.now(), program = null) => {
   const list = Array.isArray(slots) ? slots : [];
   if (!list.length) return null;
   const now = new Date(nowMs);
+  const frequency = numeric(program?.frequency_days) ?? 1;
+  if (frequency > 1 && !isValidDate(program?.start_date)) return null;
+  const cycleDays = frequency > 1 ? (7 * frequency) / gcd(7, frequency) : 7;
+  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const match = frequency > 1 ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(program.start_date) : null;
+  const anchorUtc = match ? Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : todayUtc;
+  const anchorOffset = Math.max(0, Math.round((anchorUtc - todayUtc) / 86400000));
+  const firstOffset = anchorOffset ? anchorOffset : -1;
+  const lastOffset = firstOffset + cycleDays + 8;
   const candidates = [];
-  for (let offset = -1; offset <= 8; offset += 1) {
+  for (let offset = firstOffset; offset <= lastOffset; offset += 1) {
     const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
     const weekday = isoWeekday(day);
+    candidates.push(new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime());
     for (const slot of list) {
       const start = timeMinutes(slot?.start);
       const duration = numeric(slot.duration) ?? 0;
@@ -470,8 +503,13 @@ export const nextWindowMs = (slots, nowMs = Date.now()) => {
       candidates.push(new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, start + duration).getTime());
     }
   }
-  const future = candidates.filter((candidate) => candidate > nowMs);
-  return future.length ? Math.min(...future) : null;
+  const wantsWater = (timestamp) => {
+    if (program && !frequencyAllows(program, timestamp)) return false;
+    const date = new Date(timestamp);
+    return Boolean(activeSlotFor(list, isoWeekday(date), date.getHours() * 60 + date.getMinutes()));
+  };
+  const future = [...new Set(candidates)].filter((candidate) => candidate > nowMs).sort((a, b) => a - b);
+  return future.find((candidate) => wantsWater(candidate - 60000) !== wantsWater(candidate)) ?? null;
 };
 
 export const activeProgram = (program, nowMs = Date.now()) => {
@@ -487,7 +525,7 @@ export const activeProgram = (program, nowMs = Date.now()) => {
     slot,
     slotId: slot ? slot.id : null,
     frequencyOk,
-    nextChangeMs: frequencyOk ? nextWindowMs(program.slots, nowMs) : null,
+    nextChangeMs: nextWindowMs(program.slots, nowMs, program),
   };
 };
 
@@ -771,6 +809,9 @@ const CARD_CSS = `
   ha-card[data-surface="blend"]{background:transparent;border-color:transparent;box-shadow:none}
   .row{display:flex;align-items:center;gap:14px;padding:14px 16px}
   .compact .row{padding:12px 14px;gap:12px}
+  .row-content{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:14px;cursor:pointer}
+  .row-content:focus-visible{outline:2px solid var(--primary-color);outline-offset:3px;border-radius:12px}
+  .compact .row-content{gap:12px}
   .icon{flex:0 0 auto;width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb, var(--water-flow-accent-color) 18%, transparent);color:var(--water-flow-accent-color)}
   .compact .icon{width:38px;height:38px}
   .icon ha-icon{--mdc-icon-size:24px}
@@ -852,6 +893,16 @@ const CARD_CSS = `
   .day:focus-visible,.week-day:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
   .slot-grid{display:flex;gap:8px;flex-wrap:wrap}
   .slot-grid label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--secondary-text-color)}
+  .number-control{display:inline-flex;align-items:stretch;height:40px}
+  .number-control .input.num{width:76px;border-radius:10px 0 0 10px;padding-right:7px;-moz-appearance:textfield}
+  .number-control input[type="number"]::-webkit-inner-spin-button,.number-control input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+  .number-steps{display:flex;flex-direction:column;width:30px;overflow:hidden;border:1px solid var(--divider-color);border-left:0;border-radius:0 10px 10px 0;background:var(--card-background-color,var(--ha-card-background))}
+  .number-step{display:flex;flex:1;align-items:center;justify-content:center;min-height:0;padding:0;border:0;background:transparent;color:var(--secondary-text-color);cursor:pointer}
+  .number-step+ .number-step{border-top:1px solid var(--divider-color)}
+  .number-step ha-icon{--mdc-icon-size:15px}
+  .number-step:hover{background:color-mix(in srgb,var(--water-flow-accent-color) 12%,transparent);color:var(--water-flow-accent-color)}
+  .number-step:focus-visible{position:relative;z-index:1;outline:2px solid var(--primary-color);outline-offset:-2px}
+  .number-step:active{background:color-mix(in srgb,var(--water-flow-accent-color) 22%,transparent)}
   .add{width:100%;border:1px dashed var(--divider-color);background:transparent;color:var(--primary-text-color);border-radius:12px;padding:11px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
   .add:hover{border-color:var(--water-flow-accent-color);color:var(--water-flow-accent-color)}
   .add:disabled,.btn:disabled,.slot-remove:disabled{opacity:.48;cursor:default}
@@ -880,17 +931,55 @@ const CARD_CSS = `
 
 export class WaterFlowCard extends HTMLElementBase {
   set hass(value) {
-    const previousState = this._hass?.states?.[this.config?.entity]?.state;
-    const previousSession = this._sessionStartMs;
     this._hass = value;
-    const nextState = value?.states?.[this.config?.entity]?.state;
-    // Session tracking: the pump turning on stamps the clock, anything but
-    // "on" clears it, so the elapsed chip survives re-renders but not a stop.
-    if (nextState === 'on' && previousState !== 'on') this._sessionStartMs = Date.now();
-    if (nextState !== 'on') this._sessionStartMs = null;
-    if (previousSession !== this._sessionStartMs) this._sessionMinute = null;
+    this._syncSessionTracking();
     const autoPicker = this._dialog?.open ? this._dialog.querySelector('[data-field="auto_entity"]') : null;
     if (autoPicker) autoPicker.hass = value;
+    this._renderIfChanged();
+  }
+
+  connectedCallback() { this._syncSessionTracking(); }
+
+  disconnectedCallback() { this._stopSessionTicker(); }
+
+  _syncSessionTracking() {
+    const entityId = this.config?.entity;
+    const state = this._hass?.states?.[entityId];
+    if (state?.state !== 'on') {
+      this._sessionStartMs = null;
+      this._sessionMinute = null;
+      this._sessionEntityId = entityId;
+      this._stopSessionTicker();
+      return;
+    }
+    if (this._sessionEntityId !== entityId || !this._sessionStartMs) {
+      const lastChanged = Date.parse(state.last_changed);
+      this._sessionStartMs = Number.isFinite(lastChanged) ? lastChanged : Date.now();
+      this._sessionMinute = sessionMinutes(Date.now(), this._sessionStartMs);
+    }
+    this._sessionEntityId = entityId;
+    this._startSessionTicker();
+  }
+
+  _startSessionTicker() {
+    if (!globalThis.window || this._sessionTicker || !this._sessionStartMs || this.isConnected === false) return;
+    this._sessionTicker = globalThis.setInterval(() => this._tickSession(), 15000);
+  }
+
+  _stopSessionTicker() {
+    if (this._sessionTicker === undefined || this._sessionTicker === null) return;
+    globalThis.clearInterval(this._sessionTicker);
+    this._sessionTicker = null;
+  }
+
+  _tickSession() {
+    if (!this._sessionStartMs || this._entity()?.state !== 'on') {
+      this._stopSessionTicker();
+      return;
+    }
+    const minute = sessionMinutes(Date.now(), this._sessionStartMs);
+    if (minute === null || minute === this._sessionMinute) return;
+    this._sessionMinute = minute;
     this._renderIfChanged();
   }
 
@@ -900,6 +989,7 @@ export class WaterFlowCard extends HTMLElementBase {
       throw new Error('entity must be a switch entity, for example switch.irrigazione');
     }
     const next = { ...config };
+    const entityChanged = this.config?.entity !== next.entity;
     if (Object.hasOwn(next, 'accent_color')) {
       const accent = normalizeAccentColor(next.accent_color);
       if (accent === null && String(next.accent_color ?? '').trim()) throw new Error('accent_color must be a hex colour');
@@ -926,6 +1016,7 @@ export class WaterFlowCard extends HTMLElementBase {
     }
     if (Object.hasOwn(next, 'animation_duration')) next.animation_duration = normalizeAnimationDuration(next.animation_duration);
     this.config = next;
+    if (entityChanged) this._syncSessionTracking();
     this._render();
   }
 
@@ -974,14 +1065,19 @@ export class WaterFlowCard extends HTMLElementBase {
   _showServiceError(error) {
     const strings = this._strings();
     const message = strings.serviceError(error?.message || String(error));
-    this._dialogError = message;
-    if (this._errorBox) this._errorBox.textContent = message;
-    else this._renderCardError(message);
+    if (this._dialog?.open && this._errorBox) {
+      this._dialogError = message;
+      this._errorBox.textContent = message;
+      return;
+    }
+    this._cardServiceError = message;
+    this._renderIfChanged();
   }
 
-  _renderCardError(message) {
-    const box = this.shadowRoot?.querySelector?.('.error');
-    if (box) box.textContent = message;
+  _clearCardServiceError() {
+    if (!this._cardServiceError) return;
+    this._cardServiceError = null;
+    this._renderIfChanged();
   }
 
   _renderKey() {
@@ -997,6 +1093,7 @@ export class WaterFlowCard extends HTMLElementBase {
       program,
       this._sessionMinute,
       this._dialogError,
+      this._cardServiceError,
     ]);
   }
 
@@ -1069,12 +1166,12 @@ export class WaterFlowCard extends HTMLElementBase {
       const next = statusView.nextChangeMs ? new Date(statusView.nextChangeMs) : null;
       chips.push(`<span>${esc(strings.nextWindow + (next ? `${String(next.getHours()).padStart(2, '0')}:${String(next.getMinutes()).padStart(2, '0')}` : strings.none))}</span>`);
     }
-    const error = program?.last_error ? errorLabel(program.last_error, strings) : '';
+    const error = this._cardServiceError || (program?.last_error ? errorLabel(program.last_error, strings) : '');
     const title = esc(cardTitle(config, this._hass));
     const icon = esc(config.icon || 'mdi:water-pump');
     const autoLabel = auto ? (auto.state === 'on' ? strings.autoOn : strings.autoOff) : strings.noAuto;
     const frequency = program ? frequencyLabel(program.frequency_days, strings) : strings.none;
-    const activeSlotId = program?.active_slot_id || statusView.slotId;
+    const activeSlotId = statusView.slotId;
     const activeWindowIndex = Array.isArray(program?.slots) && activeSlotId
       ? program.slots.findIndex((slot) => slot.id === activeSlotId)
       : -1;
@@ -1096,11 +1193,13 @@ export class WaterFlowCard extends HTMLElementBase {
     const backdrop = state ? strings.openDetails(cardTitle(config, this._hass)) : strings.unavailable;
     return `
       <ha-card class="${layout}" data-surface="${surface}" data-running="${running}" data-animations="${config.animations !== false}" style="${accent ? `--water-flow-accent-color:${accent};` : ''}" aria-label="${esc(backdrop)}" title="${esc(ariaAction)}">
-        <div class="row" data-act="card">
-          <div class="icon ${unavailable ? 'unavailable' : ''}"><ha-icon icon="${icon}"></ha-icon></div>
-          <div class="main">
-            <div class="title">${title}</div>
-            <div class="status-line">${chips.join('')}</div>
+        <div class="row">
+          <div class="row-content" role="button" tabindex="0" data-act="card" aria-label="${esc(cardTitle(config, this._hass))}" title="${esc(ariaAction)}">
+            <div class="icon ${unavailable ? 'unavailable' : ''}"><ha-icon icon="${icon}"></ha-icon></div>
+            <div class="main">
+              <div class="title">${title}</div>
+              <div class="status-line">${chips.join('')}</div>
+            </div>
           </div>
           <div class="side">
             ${config.show_schedule_button !== false ? `<button class="round" type="button" data-act="schedule" data-focus="slots" aria-label="${esc(strings.windowsAria)}"><ha-icon icon="mdi:calendar-clock"></ha-icon></button>` : ''}
@@ -1127,16 +1226,16 @@ export class WaterFlowCard extends HTMLElementBase {
     root.addEventListener('keydown', (event) => {
       if (event.key !== 'Enter' && event.key !== ' ') return;
       const target = event.target?.closest?.('[data-act="card"]');
-      if (!target) return;
+      if (!target || event.target !== target) return;
       event.preventDefault();
       this._cardAction();
     });
   }
 
   _cardAction() {
-    const strings = this._strings();
     const call = actionCall(this.config?.tap_action ?? 'toggle', this.config.entity);
     if (!call) return;
+    this._clearCardServiceError();
     fireHaptic(this.config.haptics !== false, this.config.haptics_style);
     this._service(call.domain, call.service, call.data);
   }
@@ -1147,6 +1246,7 @@ export class WaterFlowCard extends HTMLElementBase {
       this.openSchedule('slots');
       return;
     }
+    this._clearCardServiceError();
     fireHaptic(this.config.haptics !== false, this.config.haptics_style);
     const call = toggleAutoCall(auto);
     this._service(call.domain, call.service, call.data);
@@ -1323,8 +1423,8 @@ export class WaterFlowCard extends HTMLElementBase {
         </div>
         <div class="slot-grid">
           <label>${esc(strings.start)}<input class="input" type="time" aria-label="${esc(`${strings.window(index + 1)} · ${strings.start}`)}" data-slot="${index}" data-slot-field="start" value="${esc(slot.start)}"></label>
-          <label>${esc(strings.duration)}<input class="input num" type="number" min="1" max="${MAX_DURATION_MINUTES}" step="1" aria-label="${esc(`${strings.window(index + 1)} · ${strings.duration}`)}" data-slot="${index}" data-slot-field="duration" value="${esc(slot.duration)}"></label>
-          <label>${esc(strings.liters)}<input class="input num" type="number" min="0" step="any" aria-label="${esc(`${strings.window(index + 1)} · ${strings.liters}`)}" data-slot="${index}" data-slot-field="liters" value="${esc(slot.liters)}" title="${esc(strings.litersHelp)}" placeholder="—"></label>
+          <label>${esc(strings.duration)}<span class="number-control"><input class="input num" id="wf-slot-${index}-duration" type="number" min="1" max="${MAX_DURATION_MINUTES}" step="1" aria-label="${esc(`${strings.window(index + 1)} · ${strings.duration}`)}" data-slot="${index}" data-slot-field="duration" value="${esc(slot.duration)}"><span class="number-steps"><button class="number-step" type="button" data-act="step-field" data-slot="${index}" data-slot-field="duration" data-direction="1" aria-label="${esc(strings.increaseValue(strings.duration, index + 1))}" aria-controls="wf-slot-${index}-duration"><ha-icon icon="mdi:chevron-up"></ha-icon></button><button class="number-step" type="button" data-act="step-field" data-slot="${index}" data-slot-field="duration" data-direction="-1" aria-label="${esc(strings.decreaseValue(strings.duration, index + 1))}" aria-controls="wf-slot-${index}-duration"><ha-icon icon="mdi:chevron-down"></ha-icon></button></span></span></label>
+          <label>${esc(strings.liters)}<span class="number-control"><input class="input num" id="wf-slot-${index}-liters" type="number" min="0" step="any" aria-label="${esc(`${strings.window(index + 1)} · ${strings.liters}`)}" data-slot="${index}" data-slot-field="liters" value="${esc(slot.liters)}" title="${esc(strings.litersHelp)}" placeholder="—"><span class="number-steps"><button class="number-step" type="button" data-act="step-field" data-slot="${index}" data-slot-field="liters" data-direction="1" aria-label="${esc(strings.increaseValue(strings.liters, index + 1))}" aria-controls="wf-slot-${index}-liters"><ha-icon icon="mdi:chevron-up"></ha-icon></button><button class="number-step" type="button" data-act="step-field" data-slot="${index}" data-slot-field="liters" data-direction="-1" aria-label="${esc(strings.decreaseValue(strings.liters, index + 1))}" aria-controls="wf-slot-${index}-liters"><ha-icon icon="mdi:chevron-down"></ha-icon></button></span></span></label>
         </div>
       </div>`;
   }
@@ -1364,6 +1464,18 @@ export class WaterFlowCard extends HTMLElementBase {
     }
     if (action === 'discard-changes') { this._closeDialog(true); return; }
     if (action === 'confirm-delete') { this._deleteDraft(); return; }
+    if (action === 'step-field') {
+      const index = Number(target.dataset.slot);
+      const field = target.dataset.slotField;
+      if (!Number.isInteger(index) || !draft.slots[index] || !['duration', 'liters'].includes(field)) return;
+      const value = stepScheduleValue(draft.slots[index][field], field, Number(target.dataset.direction));
+      const input = this._dialog.querySelector(`[data-slot="${index}"][data-slot-field="${field}"]`);
+      if (!input) return;
+      input.value = String(value);
+      this._dialogInput(input);
+      input.focus();
+      return;
+    }
     if (action === 'add-slot') {
       if (draft.slots.length >= MAX_SLOTS) return;
       const slot = slotDraft();

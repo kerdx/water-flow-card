@@ -288,11 +288,31 @@ def frequency_allows(program: dict[str, Any], now: datetime) -> bool:
     return distance >= 0 and distance % frequency == 0
 
 
-def program_status(slots: list[dict[str, Any]], enabled: bool, now: datetime) -> tuple[dict[str, Any] | None, datetime | None]:
-    """Return actionable slot and next change; disabled programs return neither."""
+def release_action(program: dict[str, Any] | None, switch_state: str | None, auto_on: bool) -> str | None:
+    """Return the safety command needed before the scheduler releases a pump."""
+    if not program or not program.get("enabled") or not auto_on:
+        return None
+    if switch_state is None or switch_state in ("unavailable", "unknown"):
+        raise ScheduleError(
+            "Cannot safely release scheduler control while the switch is unavailable",
+            "cannot_release_control",
+        )
+    return "turn_off" if switch_state == "on" else None
+
+
+def program_status(
+    slots: list[dict[str, Any]],
+    enabled: bool,
+    now: datetime,
+    frequency_days: int = 1,
+    start_date: str | None = None,
+) -> tuple[dict[str, Any] | None, datetime | None]:
+    """Return the actionable slot and next pump-state change."""
     if not enabled:
         return None, None
-    return active_slot(slots, now), next_boundary(slots, now)
+    program = {"enabled": enabled, "slots": slots, "frequency_days": frequency_days, "start_date": start_date}
+    slot = active_slot(slots, now) if frequency_allows(program, now) else None
+    return slot, next_boundary(slots, now, frequency_days, start_date)
 
 
 def apply_key(program: dict[str, Any], now: datetime) -> str:
@@ -309,25 +329,75 @@ def apply_key(program: dict[str, Any], now: datetime) -> str:
     return slot["id"] if slot else "off"
 
 
-def next_boundary(slots: list[dict[str, Any]], now: datetime) -> datetime | None:
-    """The next local time a slot starts or stops."""
-    candidates: list[datetime] = []
+def next_boundary(
+    slots: list[dict[str, Any]],
+    now: datetime,
+    frequency_days: int = 1,
+    start_date: str | None = None,
+) -> datetime | None:
+    """The next local time the schedule changes whether the pump should run."""
+    frequency = int(frequency_days or 1)
+    program = {
+        "enabled": True,
+        "slots": slots,
+        "frequency_days": frequency,
+        "start_date": start_date,
+    }
+    anchor = None
+    if frequency > 1:
+        try:
+            anchor = date.fromisoformat(start_date) if isinstance(start_date, str) else None
+        except ValueError:
+            return None
+        if anchor is None:
+            return None
     midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    # Include yesterday so an overnight window contributes its end boundary
-    # when evaluation starts after midnight.
-    for delta in range(-1, 9):
+    first_delta = (anchor - now.date()).days if anchor and anchor > now.date() else -1
+    horizon = math.lcm(7, frequency) + 8 if frequency > 1 else 8
+    last_delta = first_delta + horizon
+    candidates: dict[datetime, tuple[datetime, bool]] = {}
+
+    def add_candidates(boundaries: list[datetime], *, shifted_start: bool = False) -> None:
+        for boundary in boundaries:
+            utc_boundary = _as_utc(boundary)
+            existing = candidates.get(utc_boundary)
+            candidates[utc_boundary] = (boundary, shifted_start or bool(existing and existing[1]))
+
+    # Include each midnight because the every-N-days gate can switch the
+    # scheduler between a runnable day and a forced-off day there.
+    for delta in range(first_delta, last_delta + 1):
         day = midnight + timedelta(days=delta)
         weekday = day.isoweekday()
+        add_candidates(_valid_local_boundaries(day))
         for slot in slots:
             if weekday in slot["days"]:
                 start = _minute(slot["start"])
-                candidates.extend(_valid_local_boundaries(day + timedelta(minutes=start)))
-                candidates.extend(
-                    _valid_local_boundaries(day + timedelta(minutes=start + slot["duration"]))
+                start_boundary = day + timedelta(minutes=start)
+                resolved_starts = _valid_local_boundaries(start_boundary)
+                shifted_start = any(
+                    boundary.replace(tzinfo=None) != start_boundary.replace(tzinfo=None)
+                    for boundary in resolved_starts
                 )
+                add_candidates(resolved_starts, shifted_start=shifted_start)
+                add_candidates(_valid_local_boundaries(day + timedelta(minutes=start + slot["duration"])))
     now_utc = _as_utc(now)
-    future = [candidate for candidate in candidates if _as_utc(candidate) > now_utc]
-    return min(future, key=_as_utc) if future else None
+    future = sorted(
+        (entry for utc_candidate, entry in candidates.items() if utc_candidate > now_utc),
+        key=lambda entry: _as_utc(entry[0]),
+    )
+    for candidate, shifted_start in future:
+        before_utc = _as_utc(candidate) - timedelta(minutes=1)
+        before = before_utc.astimezone(candidate.tzinfo) if candidate.tzinfo else candidate - timedelta(minutes=1)
+        was_running = frequency_allows(program, before) and active_slot(slots, before) is not None
+        will_run = frequency_allows(program, candidate) and active_slot(slots, candidate) is not None
+        if was_running != will_run:
+            return candidate
+        # A scheduled start inside a DST gap is moved to the first valid local
+        # minute even if the original wall-time duration ends at that same
+        # boundary. Keep that real start visible as the next schedule change.
+        if shifted_start and frequency_allows(program, candidate):
+            return candidate
+    return None
 
 
 def _valid_local_boundaries(candidate: datetime) -> list[datetime]:
