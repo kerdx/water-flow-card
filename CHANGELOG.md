@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.2.6
+
+- Fix card rendering so new Home Assistant states are reflected instead of leaving stale unavailable values on screen.
+
 ## v1.2.5
 
 - Show battery readings as percentages when the sensor does not provide a unit of measurement.

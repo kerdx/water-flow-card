@@ -1185,7 +1185,6 @@ export class WaterFlowCard extends HTMLElementBase {
     if (this._dialog?.open || !this.config) return;
     const key = this._renderKey();
     if (key === this._lastRenderKey) return;
-    this._lastRenderKey = key;
     this._render();
   }
 

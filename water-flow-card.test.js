@@ -489,6 +489,36 @@ test('battery sensor without a unit still displays its percentage', () => {
   assert.match(html, /<span class="battery-value">100 %<\/span>/);
 });
 
+test('card rerenders when Home Assistant states arrive and change after configuration', () => {
+  const card = new WaterFlowCard();
+  const root = {
+    innerHTML: '',
+    __bound: false,
+    addEventListener() {},
+    querySelector(selector) {
+      return selector === 'ha-card' && this.innerHTML.includes('<ha-card') ? {} : null;
+    },
+  };
+  card.shadowRoot = root;
+  card.attachShadow = () => {};
+  card.setConfig({ ...defaultCardConfig('switch.irrigazione'), battery_entity: 'sensor.irrigazione_battery' });
+
+  card.hass = fakeHass({ states: {
+    ...states,
+    'sensor.irrigazione_battery': { state: '100', attributes: { unit_of_measurement: '%', device_class: 'battery' } },
+  } });
+  assert.match(root.innerHTML, /class="state-chip live" data-state="on">In irrigazione/);
+  assert.match(root.innerHTML, /<span class="battery-value">100 %<\/span>/);
+
+  card.hass = fakeHass({ states: {
+    ...states,
+    'switch.irrigazione': { state: 'off', attributes: { friendly_name: 'Irrigazione' } },
+    'sensor.irrigazione_battery': { state: '42', attributes: { unit_of_measurement: '%', device_class: 'battery' } },
+  } });
+  assert.match(root.innerHTML, /class="state-chip" data-state="off">Spenta/);
+  assert.match(root.innerHTML, /<span class="battery-value">42 %<\/span>/);
+});
+
 test('more-info card action uses the Home Assistant event instead of a service call', () => {
   const calls = [];
   const events = [];
