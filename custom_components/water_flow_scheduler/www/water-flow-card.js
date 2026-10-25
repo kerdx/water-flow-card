@@ -804,15 +804,19 @@ const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => (
 
 const CARD_CSS = `
   :host{display:block}
-  ha-card{--water-flow-accent-color:var(--primary-color);position:relative;overflow:hidden;cursor:pointer;transition:box-shadow .2s}
+  ha-card{--water-flow-accent-color:var(--primary-color);position:relative;overflow:hidden;cursor:pointer;transition:background-color .22s,border-color .22s,box-shadow .22s}
   ha-card[data-surface="elevated"]{box-shadow:0 6px 22px rgba(0,0,0,.28);border-color:color-mix(in srgb, var(--water-flow-accent-color) 35%, transparent)}
   ha-card[data-surface="blend"]{background:transparent;border-color:transparent;box-shadow:none}
+  ha-card[data-running="true"]{--water-flow-accent-color:var(--state-switch-on-color,var(--primary-color))}
+  ha-card[data-running="true"]:not([data-surface="blend"]){background-color:color-mix(in srgb,var(--water-flow-accent-color) 7%,var(--card-background-color,var(--ha-card-background)));border-color:color-mix(in srgb,var(--water-flow-accent-color) 28%,var(--divider-color))}
+  ha-card[data-running="true"][data-surface="blend"]{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--water-flow-accent-color) 30%,transparent)}
   .row{display:flex;align-items:center;gap:14px;padding:14px 16px}
   .compact .row{padding:12px 14px;gap:12px}
   .row-content{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:14px;cursor:pointer}
   .row-content:focus-visible{outline:2px solid var(--primary-color);outline-offset:3px;border-radius:12px}
   .compact .row-content{gap:12px}
-  .icon{flex:0 0 auto;width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb, var(--water-flow-accent-color) 18%, transparent);color:var(--water-flow-accent-color)}
+  .icon{flex:0 0 auto;width:46px;height:46px;border:1px solid var(--divider-color);border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--secondary-background-color);color:var(--secondary-text-color);transition:background-color .22s,border-color .22s,color .22s,box-shadow .22s}
+  ha-card[data-running="true"] .icon{background:var(--water-flow-accent-color);border-color:transparent;color:var(--text-primary-color,#fff);box-shadow:0 0 0 3px color-mix(in srgb,var(--water-flow-accent-color) 20%,transparent)}
   .compact .icon{width:38px;height:38px}
   .icon ha-icon{--mdc-icon-size:24px}
   .main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
@@ -821,6 +825,8 @@ const CARD_CSS = `
   .status-line::-webkit-scrollbar{display:none}
   .status-line span+span:before{content:' · '}
   .status-line .live{color:var(--water-flow-accent-color);font-weight:600}
+  .status-line .state-chip{display:inline-block;padding:3px 9px;border:1px solid var(--divider-color);border-radius:999px;background:var(--secondary-background-color)}
+  .status-line .state-chip[data-state="on"]{background:color-mix(in srgb,var(--water-flow-accent-color) 12%,var(--secondary-background-color));border-color:color-mix(in srgb,var(--water-flow-accent-color) 38%,var(--divider-color))}
   .status-line ha-icon{--mdc-icon-size:14px;vertical-align:-2px}
   .badge{display:inline-flex;align-items:center;gap:4px;color:var(--error-color)}
   .side{flex:0 0 auto;display:flex;align-items:center;gap:8px}
@@ -1142,8 +1148,9 @@ export class WaterFlowCard extends HTMLElementBase {
     const layout = normalizeLayout(config.layout);
     const locale = cardLanguage(config, this._hass) === 'it' ? 'it-IT' : 'en-US';
     const chips = [];
+    const stateLabel = unavailable ? strings.unavailable : pumpStateLabel(status, strings);
     if (config.show_state_chip !== false) {
-      chips.push(`<span class="${running ? 'live' : ''}">${esc(unavailable ? strings.unavailable : pumpStateLabel(status, strings))}</span>`);
+      chips.push(`<span class="state-chip${running ? ' live' : ''}" data-state="${esc(status || 'unavailable')}">${esc(stateLabel)}</span>`);
     }
     if (unavailable && config.show_unavailable_badge !== false) {
       // The badge is separate from the state chip: it stays visible even when
@@ -1191,10 +1198,13 @@ export class WaterFlowCard extends HTMLElementBase {
     const ariaAction = config.tap_action === 'more-info' ? strings.actionMoreInfo
       : config.tap_action === 'none' ? strings.actionNone : strings.togglePump;
     const backdrop = state ? strings.openDetails(cardTitle(config, this._hass)) : strings.unavailable;
+    const buttonLabel = config.show_state_chip !== false
+      ? `${cardTitle(config, this._hass)} · ${stateLabel}`
+      : cardTitle(config, this._hass);
     return `
       <ha-card class="${layout}" data-surface="${surface}" data-running="${running}" data-animations="${config.animations !== false}" style="${accent ? `--water-flow-accent-color:${accent};` : ''}" aria-label="${esc(backdrop)}" title="${esc(ariaAction)}">
         <div class="row">
-          <div class="row-content" role="button" tabindex="0" data-act="card" aria-label="${esc(cardTitle(config, this._hass))}" title="${esc(ariaAction)}">
+          <div class="row-content" role="button" tabindex="0" data-act="card" aria-label="${esc(buttonLabel)}" title="${esc(ariaAction)}">
             <div class="icon ${unavailable ? 'unavailable' : ''}"><ha-icon icon="${icon}"></ha-icon></div>
             <div class="main">
               <div class="title">${title}</div>

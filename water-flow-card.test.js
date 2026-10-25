@@ -395,6 +395,9 @@ test('card markup renders state, readouts and the three sub-buttons', () => {
   assert.match(html, /data-act="schedule" data-focus="slots"/);
   assert.match(html, /data-act="schedule" data-focus="frequency"/);
   assert.match(html, /Ogni 2 giorni/);
+  assert.match(html, /data-running="true"/);
+  assert.match(html, /class="state-chip live" data-state="on">In irrigazione/);
+  assert.match(html, /aria-label="Irrigazione · In irrigazione"/);
   assert.match(html, /role="button" tabindex="0" data-act="card"/);
   assert.match(html, /data-act="schedule" data-focus="slots" aria-label=/);
   assert.match(html, /class="row-content"[^]*<\/div>\s*<div class="side">/);
@@ -407,6 +410,20 @@ test('card markup renders state, readouts and the three sub-buttons', () => {
   assert.match(englishHtml, /Watering/);
   assert.ok(!englishHtml.includes('data-act="auto"'));
   assert.ok(!englishHtml.includes('Ogni'));
+
+  const off = configuredCard(defaultCardConfig('switch.irrigazione'));
+  off._hass = fakeHass({ states: { ...states, 'switch.irrigazione': { ...states['switch.irrigazione'], state: 'off' } } });
+  const offHtml = off._cardMarkup();
+  assert.match(offHtml, /data-running="false"/);
+  assert.match(offHtml, /class="state-chip" data-state="off">Spenta/);
+  assert.match(offHtml, /aria-label="Irrigazione · Spenta"/);
+  assert.match(cardSource(), /ha-card\[data-running="true"\]\{--water-flow-accent-color:var\(--state-switch-on-color,var\(--primary-color\)\)\}/);
+  assert.match(cardSource(), /ha-card\[data-running="true"\] \.icon\{background:var\(--water-flow-accent-color\)/);
+  assert.match(cardSource(), /ha-card\[data-running="true"\]:not\(\[data-surface="blend"\]\).*background-color:color-mix/);
+  assert.match(cardSource(), /ha-card\[data-running="true"\]\[data-surface="blend"\].*box-shadow:inset/);
+  const customAccent = configuredCard({ ...defaultCardConfig('switch.irrigazione'), accent_color: '#ff8800' });
+  customAccent._hass = fakeHass();
+  assert.match(customAccent._cardMarkup(), /style="--water-flow-accent-color:#ff8800;"/);
 });
 
 test('schedule duration and liters use visible, localized accessible steppers', () => {

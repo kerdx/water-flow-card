@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.2.2
+
+- Align pump-state colors with Climate Flow Card: inactive icons stay neutral, active state uses Home Assistant's switch-on accent, and an explicit `accent_color` remains the override.
+- Add a subtle active-card tint and a clearer state badge while preserving the `default`, `elevated`, and `blend` surfaces.
+
 ## v1.2.1
 
 - Replace hard-to-see native number spinners with accessible, theme-aware duration and liters steppers; isolate the keyboard action from neighboring controls.
