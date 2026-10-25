@@ -6,7 +6,7 @@ import {
   WaterFlowCard, WaterFlowCardEditor, WATER_FLOW_CARD_TAG, WATER_FLOW_CARD_EDITOR_TAG,
   registerWaterFlowElements, isWaterFlowElementsRegistered, isHomeAssistantFrontendReady,
   scheduleWaterFlowReregistration, cardStrings, cardLanguage, resolveLanguage, fieldLabel, errorLabel,
-  defaultCardConfig, CARD_OPTION_DEFAULTS, cardDefault, stripCardDefaults, sameCardConfig,
+  defaultCardConfig, CARD_OPTION_DEFAULTS, cardDefault, stripCardDefaults, sameCardConfig, nextSlotId,
   configSchema, configSchemaFields, getEntitySuggestion, normalizeAccentColor, normalizeSurface,
   normalizeLayout, normalizeCardAction, normalizeHapticStyle, normalizeAnimationDuration,
   CARD_SURFACES, CARD_ACTIONS, HAPTIC_STYLES, ANIMATION_DURATION_DEFAULT, MAX_SLOTS, MAX_DURATION_MINUTES,
@@ -212,7 +212,7 @@ test('client validation mirrors the backend codes', () => {
   expect(withSlots(Array.from({ length: MAX_SLOTS + 1 }, (_, index) => ({ id: `s${index}`, days: [1], start: '05:30', duration: 1 }))), 'too_many_slots', { max: MAX_SLOTS });
   expect(withSlots([{ id: 'a', days: [1], start: '05:30', duration: 30 }], { frequency_days: 0 }), 'invalid_frequency', { max: MAX_FREQUENCY_DAYS });
   expect(withSlots([{ id: 'a', days: [1], start: '05:30', duration: 30 }], { frequency_days: 99 }), 'invalid_frequency', { max: MAX_FREQUENCY_DAYS });
-  expect(withSlots([{ id: 'a', days: [1], start: '05:30', duration: 30 }], { frequency_days: 2, start_date: '' }), 'invalid_start_date');
+  expect(withSlots([{ id: 'a', days: [1], start: '05:30', duration: 30 }], { frequency_days: 2, start_date: '' }), 'frequency_needs_anchor');
   expect(withSlots([{ id: 'a', days: [1], start: '05:30', duration: 30 }], { frequency_days: 2, start_date: '2026-02-30' }), 'invalid_start_date');
   expect(withSlots([{ id: 'a', days: [1], start: '05:30', duration: 30 }], { auto_entity: 'light.living_room' }), 'invalid_auto_entity');
   expect(withSlots('nope'), 'invalid_slots');
@@ -264,9 +264,13 @@ test('drafts round-trip a stored program without losing fields', () => {
   assert.deepEqual(draft.slots[0], { id: 'morning', days: [1, 3, 5], start: '05:30', duration: 30, liters: '120' });
   assert.equal(validateScheduleDraft(draft).ok, true);
   assert.deepEqual(emptyScheduleDraft().slots.length, 1);
+  assert.deepEqual(emptyScheduleDraft().slots[0].days, []);
   assert.equal(scheduleDraft(null).enabled, false);
   // A stored program without a program sensor still produces an editable draft.
-  assert.equal(scheduleDraft(undefined).slots[0].days.length, 3);
+  assert.deepEqual(scheduleDraft(undefined).slots[0].days, []);
+  assert.equal(scheduleDraft({ enabled: false, slots: [] }).slots.length, 0);
+  assert.equal(nextSlotId([{ id: 'window-1' }, { id: 'window-3' }]), 'window-2');
+  assert.equal(nextSlotId([{ id: 'weekday_morning' }]), 'window-1');
 });
 
 test('frequency rhythm follows the anchor date', () => {
@@ -541,6 +545,7 @@ test('card source keeps the dialog, the scheduler services and no prompts', () =
   assert.match(source, /strings\.scheduleEnabledHelp/);
   assert.match(source, /\.status-line span\+span:before\{content:' · '\}/);
   assert.doesNotMatch(source, /globalThis\.prompt|window\.prompt/);
+  assert.doesNotMatch(source, /globalThis\.confirm/);
   assert.doesNotMatch(source, /eval\(/);
   // The card owns the pump through the switch domain only: the tap action
   // resolves the domain from the configured switch entity.

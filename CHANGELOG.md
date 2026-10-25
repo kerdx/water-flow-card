@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.2.0
+
+- Redesign the irrigation schedule editor with a weekly overview, clearer frequency and watering-window sections, conditional anchor dates, and an entity picker for the Auto helper.
+- Protect unsaved changes with inline confirmations and show saving/deleting progress while preventing duplicate service calls.
+- Improve window limits and unique IDs, focus validation errors, and show scheduler errors in the editor; refine English and Italian copy.
+
 ## v1.1.1
 
 - Fix card editor configuration updates by sending `config-changed` events with Home Assistant's expected `detail.config` payload.

@@ -38,15 +38,16 @@ const STRINGS = {
     windows: 'Windows',
     windowsAria: 'Watering windows',
     frequency: 'Frequency',
-    frequencyHelp: 'Water every N days, counted from the anchor date below. 1 waters on every scheduled day.',
+    frequencyHelp: 'The schedule checks your selected weekdays on a repeating N-day cycle.',
+    anchorHelp: 'The cycle starts on this date; required when frequency exceeds one day.',
     nextWindow: 'Next: ',
     none: 'none',
     everyDays: (days) => (days === 1 ? 'Every day' : `Every ${days} days`),
     anchor: 'Starting from',
     scheduleTitle: 'Irrigation schedule',
     scheduleEnabled: 'Program active',
-    scheduleEnabledHelp: 'While the program is active the scheduler owns the pump switch.',
-    autoHelp: 'input_boolean handed to the scheduler: while it is on the program drives the pump, while it is off the pump stays yours.',
+    scheduleEnabledHelp: 'When enabled, the schedule can control the pump during its watering windows.',
+    autoHelp: 'When Auto is on, this schedule controls the pump. When it is off, the pump remains under your control.',
     backendMissing: 'Water Flow Scheduler is not installed. Install and configure it to edit a program (integration domain: water_flow_scheduler).',
     noProgram: 'No program saved yet',
     lastError: 'Last error: ',
@@ -61,6 +62,26 @@ const STRINGS = {
     duration: 'Duration (minutes)',
     liters: 'Liters',
     litersHelp: 'Optional target shown by the card.',
+    weekOverview: 'Weekly overview',
+    noWateringDay: 'No watering',
+    windowCount: (count) => `${count} ${count === 1 ? 'window' : 'windows'}`,
+    windowCountLimit: (count, max) => `${count} / ${max} windows`,
+    windowSectionHelp: 'Choose when and how long each watering run lasts.',
+    weekdayDetails: (day, times) => times.length ? `${day}: ${times.join(', ')}` : `${day}: no watering scheduled`,
+    selectWindowDays: (index) => `Watering days for window ${index}`,
+    emptyWindowsTitle: 'No watering windows yet',
+    emptyWindowsHelp: 'Add a window, then choose the days and time for watering.',
+    activeProgram: 'Enabled',
+    pausedProgram: 'Paused',
+    unsavedChanges: 'You have unsaved changes.',
+    discardPrompt: 'Discard your unsaved changes?',
+    discardChanges: 'Discard changes',
+    keepEditing: 'Keep editing',
+    deletePrompt: 'Delete the saved irrigation program? This cannot be undone.',
+    deleteNow: 'Delete program',
+    keepProgram: 'Keep program',
+    savingProgram: 'Saving…',
+    deletingProgram: 'Deleting…',
     invalidDraft: 'Invalid schedule.',
     emptyDraft: 'The program is empty. Add at least one watering window.',
     serviceError: (message) => `Service failed: ${message}`,
@@ -168,15 +189,16 @@ const STRINGS = {
     windows: 'Orari',
     windowsAria: 'Finestre di irrigazione',
     frequency: 'Frequenza',
-    frequencyHelp: 'Irriga ogni N giorni, contati dalla data di partenza qui sotto. 1 irriga in tutti i giorni programmati.',
+    frequencyHelp: 'Il programma verifica i giorni selezionati seguendo un ciclo di N giorni.',
+    anchorHelp: 'Il ciclo inizia da questa data; richiesta quando la frequenza supera un giorno.',
     nextWindow: 'Prossimo: ',
     none: 'nessuno',
     everyDays: (days) => (days === 1 ? 'Ogni giorno' : `Ogni ${days} giorni`),
     anchor: 'A partire dal',
     scheduleTitle: 'Pianificazione irrigazione',
     scheduleEnabled: 'Programma attivo',
-    scheduleEnabledHelp: 'Mentre il programma è attivo il pianificatore comanda lo switch della pompa.',
-    autoHelp: 'input_boolean affidata al pianificatore: accesa il programma comanda la pompa, spenta la pompa resta tua.',
+    scheduleEnabledHelp: 'Quando è attivo, il programma può controllare la pompa durante le finestre di irrigazione.',
+    autoHelp: 'Con Auto attiva, il programma controlla la pompa. Con Auto disattiva, la pompa resta sotto il tuo controllo.',
     backendMissing: 'Water Flow Scheduler non è installato. Installa e configura l’integrazione per modificare un programma (dominio: water_flow_scheduler).',
     noProgram: 'Nessun programma salvato',
     lastError: 'Ultimo errore: ',
@@ -191,6 +213,26 @@ const STRINGS = {
     duration: 'Durata (minuti)',
     liters: 'Litri',
     litersHelp: 'Obiettivo facoltativo mostrato dalla card.',
+    weekOverview: 'Riepilogo settimanale',
+    noWateringDay: 'Nessuna irrigazione',
+    windowCount: (count) => `${count} ${count === 1 ? 'fascia' : 'fasce'}`,
+    windowCountLimit: (count, max) => `${count} / ${max} fasce`,
+    windowSectionHelp: 'Scegli quando e per quanto tempo irrigare.',
+    weekdayDetails: (day, times) => times.length ? `${day}: ${times.join(', ')}` : `${day}: nessuna irrigazione programmata`,
+    selectWindowDays: (index) => `Giorni di irrigazione della fascia ${index}`,
+    emptyWindowsTitle: 'Nessuna fascia impostata',
+    emptyWindowsHelp: 'Aggiungi una fascia e scegli i giorni e l’orario di irrigazione.',
+    activeProgram: 'Attivo',
+    pausedProgram: 'In pausa',
+    unsavedChanges: 'Ci sono modifiche non salvate.',
+    discardPrompt: 'Vuoi scartare le modifiche non salvate?',
+    discardChanges: 'Scarta modifiche',
+    keepEditing: 'Continua a modificare',
+    deletePrompt: 'Eliminare il programma salvato? L’azione non può essere annullata.',
+    deleteNow: 'Elimina programma',
+    keepProgram: 'Mantieni programma',
+    savingProgram: 'Salvataggio…',
+    deletingProgram: 'Eliminazione…',
     invalidDraft: 'Pianificazione non valida.',
     emptyDraft: 'Il programma è vuoto. Aggiungi almeno una finestra di irrigazione.',
     serviceError: (message) => `Servizio non riuscito: ${message}`,
@@ -490,11 +532,18 @@ export const emptyScheduleDraft = () => ({
   slots: [slotDraft()],
 });
 
-export const slotDraft = (index = 0) => ({ id: `window-${index + 1}`, days: [1, 3, 5], start: '05:30', duration: 30, liters: '' });
+export const slotDraft = (index = 0) => ({ id: `window-${index + 1}`, days: [], start: '05:30', duration: 30, liters: '' });
+
+export const nextSlotId = (slots = []) => {
+  const ids = new Set(Array.isArray(slots) ? slots.map((slot) => slot?.id).filter(Boolean) : []);
+  let index = 1;
+  while (ids.has(`window-${index}`)) index += 1;
+  return `window-${index}`;
+};
 
 export const scheduleDraft = (program) => {
   if (!program || typeof program !== 'object') return emptyScheduleDraft();
-  const slots = Array.isArray(program.slots) && program.slots.length
+  const slots = Array.isArray(program.slots)
     ? program.slots.map((slot, index) => ({
         id: slot?.id || `window-${index + 1}`,
         days: Array.isArray(slot?.days) ? [...slot.days] : [],
@@ -526,7 +575,8 @@ export const validateScheduleDraft = (draft) => {
   if (frequency === null || !Number.isInteger(frequency) || frequency < 1 || frequency > MAX_FREQUENCY_DAYS) {
     return fail('invalid_frequency', { max: MAX_FREQUENCY_DAYS });
   }
-  if (frequency > 1 && !isValidDate(draft.start_date)) return fail('invalid_start_date');
+  if (draft.start_date && !isValidDate(draft.start_date)) return fail('invalid_start_date');
+  if (frequency > 1 && !draft.start_date) return fail('frequency_needs_anchor');
   if (draft.auto_entity && !/^input_boolean\.[A-Za-z0-9_]+$/.test(draft.auto_entity)) return fail('invalid_auto_entity');
   const ids = new Set();
   const occupied = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [] };
@@ -747,47 +797,84 @@ const CARD_CSS = `
   @keyframes wf-pulse{0%{transform:scale(1)}45%{transform:scale(1.12)}100%{transform:scale(1)}}
   ha-card[data-animations="true"][data-running="true"] .icon{animation:wf-pulse 1.6s ease-in-out infinite}
   ha-card[data-animations="false"] .icon{animation:none}
-  dialog{color:var(--primary-text-color);background:var(--card-background-color,var(--ha-card-background));border:0;border-radius:18px;padding:0;max-width:min(460px,calc(100vw - 32px));width:100%;box-shadow:0 12px 40px rgba(0,0,0,.35)}
-  dialog::backdrop{background:rgba(0,0,0,.55)}
-  .dlg-head{display:flex;align-items:center;gap:12px;padding:16px 16px 10px}
-  .dlg-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb, var(--water-flow-accent-color) 18%, transparent);color:var(--water-flow-accent-color)}
+  dialog{color:var(--primary-text-color);background:var(--card-background-color,var(--ha-card-background));border:1px solid var(--divider-color);border-radius:22px;padding:0;max-width:min(700px,calc(100vw - 28px));width:100%;max-height:min(88vh,820px);box-shadow:0 18px 56px rgba(0,0,0,.38)}
+  dialog::backdrop{background:rgba(0,0,0,.58);backdrop-filter:blur(3px)}
+  [hidden]{display:none!important}
+  .dlg-shell{display:flex;flex-direction:column;max-height:min(88vh,820px);overflow:hidden}
+  .dlg-head{display:flex;align-items:center;gap:12px;padding:20px 22px 12px}
+  .dlg-icon{width:42px;height:42px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb, var(--water-flow-accent-color) 18%, transparent);color:var(--water-flow-accent-color)}
   .dlg-titles{flex:1 1 auto;min-width:0}
-  .dlg-titles h2{margin:0;font-size:16px}
-  .dlg-sub{font-size:12px;color:var(--secondary-text-color)}
-  .close{width:32px;height:32px;border-radius:50%;border:0;background:transparent;color:var(--secondary-text-color);cursor:pointer}
+  .dlg-titles h2{margin:0;font-size:20px;letter-spacing:-.02em}
+  .dlg-sub{font-size:13px;color:var(--secondary-text-color);margin-top:2px}
+  .close{width:34px;height:34px;border-radius:50%;border:0;background:transparent;color:var(--secondary-text-color);cursor:pointer}
   .close:hover{background:var(--secondary-background-color);color:var(--primary-text-color)}
-  .dlg-body{padding:0 16px 16px;display:flex;flex-direction:column;gap:12px;max-height:min(70vh,560px);overflow-y:auto}
+  .dlg-summary{margin:0 22px 14px;padding:14px 16px;border:1px solid color-mix(in srgb, var(--water-flow-accent-color) 28%, var(--divider-color));border-radius:16px;background:color-mix(in srgb, var(--water-flow-accent-color) 7%, var(--card-background-color,var(--ha-card-background)));display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .summary-copy{display:flex;flex-direction:column;gap:3px;min-width:0}
+  .summary-copy strong{font-size:15px;font-weight:650}
+  .summary-copy small{font-size:12px;color:var(--secondary-text-color)}
+  .status-pill{flex:0 0 auto;border-radius:999px;padding:6px 10px;background:var(--secondary-background-color);color:var(--secondary-text-color);font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+  .status-pill[data-enabled="true"]{background:color-mix(in srgb, var(--success-color,#2e7d32) 15%, transparent);color:var(--success-color,#2e7d32)}
+  .dlg-body{padding:0 22px 18px;display:flex;flex-direction:column;gap:18px;min-height:0;flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain}
+  .week-overview-wrap{display:flex;flex-direction:column;gap:8px}
+  .week-overview-title{font-size:12px;font-weight:700;color:var(--secondary-text-color);letter-spacing:.04em;text-transform:uppercase}
+  .week-overview{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+  .week-day{min-width:0;min-height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 2px;border:1px solid var(--divider-color);border-radius:12px;background:var(--secondary-background-color);color:var(--secondary-text-color);font:inherit;cursor:pointer}
+  .week-day strong{font-size:12px;color:var(--primary-text-color)}
+  .week-day small{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px}
+  .week-day[data-scheduled="true"]{border-color:color-mix(in srgb, var(--water-flow-accent-color) 50%, var(--divider-color));background:color-mix(in srgb, var(--water-flow-accent-color) 12%, var(--secondary-background-color));color:var(--water-flow-accent-color)}
+  .week-day[data-today="true"] strong{color:var(--water-flow-accent-color)}
+  .week-day:disabled{cursor:default;opacity:.7}
+  .dlg-section{display:flex;flex-direction:column;gap:10px;scroll-margin:10px}
+  .dlg-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .dlg-section-head h3{margin:0;font-size:16px;font-weight:650}
+  .dlg-section-head p{margin:3px 0 0;font-size:12px;color:var(--secondary-text-color);line-height:1.4}
+  .window-count{flex:0 0 auto;color:var(--secondary-text-color);font-size:11px;font-weight:650}
   .row-field{display:flex;align-items:center;justify-content:space-between;gap:12px}
   .row-field label{font-size:14px;font-weight:500}
   .row-field .hint{font-size:12px;color:var(--secondary-text-color);line-height:1.35;margin-top:2px}
   .input{font:inherit;font-size:14px;color:var(--primary-text-color);background:var(--secondary-background-color);border:1px solid var(--divider-color);border-radius:10px;padding:8px 10px;min-width:0}
   .input:focus-visible{outline:2px solid var(--primary-color);outline-offset:1px}
+  .input[aria-invalid="true"],ha-entity-picker[aria-invalid="true"]{border-color:var(--error-color)}
   .input.num{width:96px;text-align:right}
-  .field-stack{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px solid var(--divider-color)}
-  .field-stack:first-child{border-top:0;padding-top:0}
-  .section-title{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--secondary-text-color);margin-top:4px}
+  .field-stack{display:flex;flex-direction:column;gap:12px;padding:14px 0;border-bottom:1px solid var(--divider-color);scroll-margin:10px}
   .switch{position:relative;width:42px;height:24px;flex:0 0 auto}
   .switch input{appearance:none;-webkit-appearance:none;position:absolute;inset:0;margin:0;border-radius:999px;background:var(--divider-color);border:0;cursor:pointer;transition:background .2s}
   .switch input:after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--text-primary-color,#fff);transition:transform .2s}
   .switch input:checked{background:var(--water-flow-accent-color)}
   .switch input:checked:after{transform:translateX(18px)}
-  .slot{border:1px solid var(--divider-color);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:8px;background:var(--secondary-background-color)}
+  .slot{border:1px solid var(--divider-color);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:12px;background:var(--secondary-background-color)}
   .slot-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
   .slot-head strong{font-size:13px}
   .slot-remove{border:0;background:transparent;color:var(--error-color);font:inherit;font-size:12px;cursor:pointer}
   .days{display:flex;gap:4px}
-  .day{flex:1 1 0;border:1px solid var(--divider-color);background:var(--card-background-color,var(--ha-card-background));color:var(--secondary-text-color);border-radius:8px;padding:6px 0;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+  .day{flex:1 1 0;border:1px solid var(--divider-color);background:var(--card-background-color,var(--ha-card-background));color:var(--secondary-text-color);border-radius:9px;padding:8px 0;font:inherit;font-size:12px;font-weight:650;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
   .day[aria-pressed="true"]{background:var(--water-flow-accent-color);border-color:var(--water-flow-accent-color);color:var(--text-primary-color,#fff)}
+  .day:focus-visible,.week-day:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
   .slot-grid{display:flex;gap:8px;flex-wrap:wrap}
   .slot-grid label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--secondary-text-color)}
-  .add{border:1px dashed var(--divider-color);background:transparent;color:var(--primary-text-color);border-radius:12px;padding:9px;font:inherit;font-size:13px;cursor:pointer}
+  .add{width:100%;border:1px dashed var(--divider-color);background:transparent;color:var(--primary-text-color);border-radius:12px;padding:11px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
   .add:hover{border-color:var(--water-flow-accent-color);color:var(--water-flow-accent-color)}
+  .add:disabled,.btn:disabled,.slot-remove:disabled{opacity:.48;cursor:default}
+  .empty-windows{padding:18px;border:1px dashed var(--divider-color);border-radius:14px;text-align:center;color:var(--secondary-text-color);font-size:13px}
+  .empty-windows strong{display:block;color:var(--primary-text-color);font-size:14px;margin-bottom:4px}
   .dlg-error{min-height:1.3em;margin:0;font-size:12px;color:var(--error-color)}
-  .dlg-foot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;padding-top:4px;border-top:1px solid var(--divider-color)}
-  .btn{font:inherit;font-size:13px;font-weight:600;border-radius:999px;padding:9px 16px;cursor:pointer;border:1px solid var(--divider-color);background:var(--secondary-background-color);color:var(--primary-text-color)}
+  .dlg-backend-error{margin:0 22px 14px;padding:9px 12px;border-radius:12px;background:color-mix(in srgb, var(--error-color) 10%, var(--card-background-color,var(--ha-card-background)));color:var(--error-color);font-size:12px;line-height:1.4}
+  .dlg-foot{display:flex;flex-direction:column;gap:10px;padding:12px 22px max(14px,env(safe-area-inset-bottom));border-top:1px solid var(--divider-color);background:var(--card-background-color,var(--ha-card-background))}
+  .dlg-feedback{min-height:1.1em;color:var(--secondary-text-color);font-size:12px}
+  .dlg-feedback[data-dirty="true"]{color:var(--primary-color);font-weight:600}
+  .dlg-actions{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .dlg-actions-right{display:flex;align-items:center;justify-content:flex-end;gap:8px}
+  .dlg-confirm{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid color-mix(in srgb, var(--error-color) 38%, var(--divider-color));border-radius:12px;background:color-mix(in srgb, var(--error-color) 7%, var(--card-background-color,var(--ha-card-background)))}
+  .dlg-confirm p{flex:1 1 180px;margin:0;font-size:13px}
+  .dlg-confirm-actions{display:flex;gap:8px}
+  .btn{font:inherit;font-size:13px;font-weight:650;border-radius:999px;padding:10px 16px;cursor:pointer;border:1px solid var(--divider-color);background:var(--secondary-background-color);color:var(--primary-text-color);transition:filter .15s,transform .15s}
+  .btn:not(:disabled):hover{filter:brightness(1.08);transform:translateY(-1px)}
   .btn.primary{background:var(--water-flow-accent-color);border-color:var(--water-flow-accent-color);color:var(--text-primary-color,#fff)}
   .btn.danger{color:var(--error-color);border-color:color-mix(in srgb, var(--error-color) 45%, transparent);background:transparent}
-  .btn:focus-visible,.day:focus-visible,.slot-remove:focus-visible,.close:focus-visible,.add:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
+  .btn:focus-visible,.slot-remove:focus-visible,.close:focus-visible,.add:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
+  ha-entity-picker{flex:1 1 190px;max-width:280px;min-width:0}
+  @media(max-width:520px){dialog{max-width:calc(100vw - 16px);border-radius:18px}.dlg-head{padding:16px 16px 10px}.dlg-summary{margin:0 16px 12px;padding:12px}.dlg-body{padding:0 16px 14px;gap:14px}.dlg-foot{padding:10px 16px max(12px,env(safe-area-inset-bottom))}.week-overview{gap:4px}.week-day{min-height:52px}.week-day small{font-size:8px}.slot-grid label{flex:1 1 110px}.dlg-actions{align-items:stretch}.dlg-actions-right{margin-left:auto}}
+  @media(prefers-reduced-motion:reduce){.day,.btn,.add{transition:none}.btn:not(:disabled):hover{transform:none}}
   .preview{pointer-events:none}
 `;
 
@@ -802,6 +889,8 @@ export class WaterFlowCard extends HTMLElementBase {
     if (nextState === 'on' && previousState !== 'on') this._sessionStartMs = Date.now();
     if (nextState !== 'on') this._sessionStartMs = null;
     if (previousSession !== this._sessionStartMs) this._sessionMinute = null;
+    const autoPicker = this._dialog?.open ? this._dialog.querySelector('[data-field="auto_entity"]') : null;
+    if (autoPicker) autoPicker.hass = value;
     this._renderIfChanged();
   }
 
@@ -853,8 +942,14 @@ export class WaterFlowCard extends HTMLElementBase {
 
   _entity() { return this._hass?.states?.[this.config?.entity] ?? null; }
 
+  _autoEntity() {
+    const program = this._program();
+    if (program) return typeof program.auto_entity === 'string' ? program.auto_entity : null;
+    return typeof this.config?.auto_entity === 'string' ? this.config.auto_entity : null;
+  }
+
   _autoState() {
-    const auto = this.config?.auto_entity;
+    const auto = this._autoEntity();
     return auto ? this._hass?.states?.[auto] ?? null : null;
   }
 
@@ -865,10 +960,15 @@ export class WaterFlowCard extends HTMLElementBase {
       this._showServiceError(new Error(this._strings().backendMissing));
       return Promise.resolve();
     }
-    return Promise.resolve(this._hass.callService(domain, service, data)).catch((error) => {
+    try {
+      return Promise.resolve(this._hass.callService(domain, service, data)).catch((error) => {
+        this._showServiceError(error);
+        return undefined;
+      });
+    } catch (error) {
       this._showServiceError(error);
-      return undefined;
-    });
+      return Promise.resolve();
+    }
   }
 
   _showServiceError(error) {
@@ -935,6 +1035,7 @@ export class WaterFlowCard extends HTMLElementBase {
     const state = this._entity();
     const program = this._program();
     const auto = this._autoState();
+    const autoEntity = this._autoEntity();
     const status = state?.state;
     const unavailable = status === 'unavailable' || status === 'unknown';
     const statusView = activeProgram(program, Date.now());
@@ -973,13 +1074,17 @@ export class WaterFlowCard extends HTMLElementBase {
     const icon = esc(config.icon || 'mdi:water-pump');
     const autoLabel = auto ? (auto.state === 'on' ? strings.autoOn : strings.autoOff) : strings.noAuto;
     const frequency = program ? frequencyLabel(program.frequency_days, strings) : strings.none;
-    const windowLabel = program?.active_slot_id || statusView.slotId
-      ? String(program?.active_slot_id || statusView.slotId)
+    const activeSlotId = program?.active_slot_id || statusView.slotId;
+    const activeWindowIndex = Array.isArray(program?.slots) && activeSlotId
+      ? program.slots.findIndex((slot) => slot.id === activeSlotId)
+      : -1;
+    const windowLabel = activeWindowIndex >= 0
+      ? strings.window(activeWindowIndex + 1)
       : program && statusView.nextChangeMs
         ? (() => { const next = new Date(statusView.nextChangeMs); return `${String(next.getHours()).padStart(2, '0')}:${String(next.getMinutes()).padStart(2, '0')}`; })()
         : strings.none;
     const subRow = [];
-    if (config.show_auto_button !== false && config.auto_entity) {
+    if (config.show_auto_button !== false && autoEntity) {
       subRow.push(`<button class="sub" type="button" data-act="auto" data-active="${auto?.state === 'on'}" aria-pressed="${auto?.state === 'on'}" title="${esc(autoLabel)}"><ha-icon icon="mdi:calendar-check"></ha-icon><span class="sub-label">${esc(strings.auto)}</span></button>`);
     }
     if (config.show_schedule_button !== false) {
@@ -1017,7 +1122,7 @@ export class WaterFlowCard extends HTMLElementBase {
       const act = target.dataset.act;
       if (act === 'card') { this._cardAction(); return; }
       if (act === 'auto') { this._toggleAuto(); return; }
-      if (act === 'schedule') { this.openSchedule(target.dataset.focus || 'slots'); return; }
+      if (act === 'schedule') { this._scheduleOpener = target; this.openSchedule(target.dataset.focus || 'slots'); return; }
     });
     root.addEventListener('keydown', (event) => {
       if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -1037,7 +1142,7 @@ export class WaterFlowCard extends HTMLElementBase {
   }
 
   _toggleAuto() {
-    const auto = this.config?.auto_entity;
+    const auto = this._autoEntity();
     if (!auto) {
       this.openSchedule('slots');
       return;
@@ -1050,36 +1155,51 @@ export class WaterFlowCard extends HTMLElementBase {
   // --- Schedule dialog -------------------------------------------------
 
   openSchedule(focus = 'slots') {
-    const strings = this._strings();
     if (!this.shadowRoot) return;
     if (!this._dialog) {
       const dialog = document.createElement('dialog');
-      dialog.setAttribute('aria-label', strings.scheduleTitle);
-      dialog.addEventListener('close', () => { this._lastRenderKey = null; });
+      dialog.addEventListener('close', () => this._onDialogClose());
       dialog.addEventListener('click', (event) => {
+        if (event.target === dialog) { this._requestDialogClose(); return; }
         const target = event.target?.closest?.('[data-act]');
         if (!target) return;
         this._dialogAction(target.dataset.act, target);
       });
       dialog.addEventListener('input', (event) => this._dialogInput(event.target));
       dialog.addEventListener('change', (event) => this._dialogInput(event.target));
+      dialog.addEventListener('value-changed', (event) => {
+        if (event.target?.dataset?.field !== 'auto_entity') return;
+        this._dialogInput({ dataset: { field: 'auto_entity' }, value: event.detail?.value ?? '' });
+      });
+      dialog.addEventListener('cancel', (event) => {
+        if (this._busy || this._isScheduleDraftDirty()) {
+          event.preventDefault();
+          this._requestDialogClose();
+        }
+      });
       dialog.addEventListener('keydown', (event) => { if (event.key === 'Enter' && event.target?.tagName === 'INPUT') event.preventDefault(); });
       this._dialog = dialog;
       this.shadowRoot.appendChild(dialog);
     }
+    if (this._dialog.open) {
+      this._focusScheduleSection(focus);
+      return;
+    }
     this._dialogError = null;
-    this._draft = scheduleDraft(this._program());
-    if (this.config?.auto_entity && !this._draft.auto_entity) this._draft.auto_entity = this.config.auto_entity;
+    this._busy = false;
+    this._busyAction = null;
+    this._confirmDelete = false;
+    this._confirmDiscard = false;
+    const program = this._program();
+    this._draft = scheduleDraft(program);
+    if (!program && this.config?.auto_entity && !this._draft.auto_entity) this._draft.auto_entity = this.config.auto_entity;
+    this._scheduleSnapshot = JSON.stringify(this._draft);
     this._fillDialog();
     if (!this._dialog.open) {
       if (typeof this._dialog.showModal === 'function') this._dialog.showModal();
       else this._dialog.setAttribute('open', '');
     }
-    if (focus === 'frequency') {
-      const input = this._dialog.querySelector('[data-field="frequency_days"]');
-      input?.focus?.();
-      input?.select?.();
-    }
+    this._focusScheduleSection(focus);
   }
 
   _fillDialog() {
@@ -1088,68 +1208,113 @@ export class WaterFlowCard extends HTMLElementBase {
     const strings = this._strings();
     const draft = this._draft || (this._draft = scheduleDraft(this._program()));
     const program = this._program();
+    const backendError = program?.last_error ? errorLabel(program.last_error, strings) : '';
+    dialog.setAttribute('aria-label', strings.scheduleTitle);
     dialog.innerHTML = `
       <style>${CARD_CSS}</style>
-      <div class="dlg-head">
-        <span class="dlg-icon"><ha-icon icon="mdi:water-pump"></ha-icon></span>
-        <div class="dlg-titles"><h2>${esc(strings.scheduleTitle)}</h2><div class="dlg-sub">${esc(program ? cardTitle(this.config, this._hass) : strings.noProgram)}</div></div>
-        <button class="close" type="button" data-act="close" aria-label="${esc(strings.closeSchedule)}"><ha-icon icon="mdi:close"></ha-icon></button>
-      </div>
-      <div class="dlg-body">
-        <div class="field-stack">
-          <div class="row-field">
-            <div><label for="wf-enabled">${esc(strings.scheduleEnabled)}</label><div class="hint">${esc(strings.scheduleEnabledHelp)}</div></div>
-            <span class="switch"><input id="wf-enabled" type="checkbox" role="switch" data-field="enabled" ${draft.enabled ? 'checked' : ''}></span>
-          </div>
-          <div class="row-field">
-            <div><label for="wf-frequency">${esc(strings.frequency)}</label><div class="hint">${esc(strings.frequencyHelp)}</div></div>
-            <input class="input num" id="wf-frequency" type="number" min="1" max="${MAX_FREQUENCY_DAYS}" step="1" data-field="frequency_days" value="${esc(draft.frequency_days)}">
-          </div>
-          <div class="row-field">
-            <label for="wf-anchor">${esc(strings.anchor)}</label>
-            <input class="input" id="wf-anchor" type="date" data-field="start_date" value="${esc(draft.start_date)}">
-          </div>
-          <div class="row-field">
-            <div><label for="wf-auto">${esc(strings.auto)}</label><div class="hint">${esc(strings.autoHelp)}</div></div>
-            <input class="input" id="wf-auto" type="text" list="wf-auto-list" data-field="auto_entity" placeholder="input_boolean.irrigazione_attiva" value="${esc(draft.auto_entity)}">
-          </div>
+      <div class="dlg-shell">
+        <div class="dlg-head">
+          <span class="dlg-icon"><ha-icon icon="mdi:water-pump"></ha-icon></span>
+          <div class="dlg-titles"><h2>${esc(strings.scheduleTitle)}</h2><div class="dlg-sub">${esc(cardTitle(this.config, this._hass))}</div></div>
+          <button class="close" type="button" data-act="close" aria-label="${esc(strings.closeSchedule)}"><ha-icon icon="mdi:close"></ha-icon></button>
         </div>
-        <div class="section-title" id="wf-windows">${esc(strings.windowsAria)}</div>
-        <div class="slots">${draft.slots.map((slot, index) => this._slotMarkup(slot, index, strings)).join('')}</div>
-        <button class="add" type="button" data-act="add-slot">${esc(strings.addWindow)}</button>
-        <p class="dlg-error" role="alert" aria-live="assertive">${esc(this._dialogError || '')}</p>
-        <div class="dlg-foot">
-          ${program ? `<button class="btn danger" type="button" data-act="delete">${esc(strings.deleteProgram)}</button>` : ''}
-          <button class="btn" type="button" data-act="close">${esc(strings.cancel)}</button>
-          <button class="btn primary" type="button" data-act="save">${esc(strings.saveProgram)}</button>
+        <div class="dlg-summary" aria-live="polite">
+          <div class="summary-copy">
+            <strong data-role="summary-frequency">${esc(frequencyLabel(draft.frequency_days, strings))}</strong>
+            <small data-role="summary-count">${esc(strings.windowCount(draft.slots.length))}</small>
+          </div>
+          <span class="status-pill" data-role="program-status" data-enabled="${draft.enabled}">${esc(draft.enabled ? strings.activeProgram : strings.pausedProgram)}</span>
         </div>
+        ${backendError ? `<p class="dlg-backend-error" role="alert">${esc(strings.lastError + backendError)}</p>` : ''}
+        <div class="dlg-body">
+          <section class="field-stack" id="wf-frequency-section" tabindex="-1" aria-label="${esc(strings.frequency)}">
+            <div class="row-field">
+              <div><label for="wf-enabled">${esc(strings.scheduleEnabled)}</label><div class="hint" id="wf-enabled-help">${esc(strings.scheduleEnabledHelp)}</div></div>
+              <span class="switch"><input id="wf-enabled" type="checkbox" role="switch" aria-describedby="wf-enabled-help" data-field="enabled" ${draft.enabled ? 'checked' : ''}></span>
+            </div>
+            <div class="row-field">
+              <div><label for="wf-frequency">${esc(strings.frequency)}</label><div class="hint" id="wf-frequency-help">${esc(strings.frequencyHelp)}</div></div>
+              <input class="input num" id="wf-frequency" type="number" min="1" max="${MAX_FREQUENCY_DAYS}" step="1" aria-describedby="wf-frequency-help" data-field="frequency_days" value="${esc(draft.frequency_days)}">
+            </div>
+            <div class="row-field" data-role="anchor-row" ${Number(draft.frequency_days) > 1 ? '' : 'hidden'}>
+              <div><label for="wf-anchor">${esc(strings.anchor)}</label><div class="hint" id="wf-anchor-help">${esc(strings.anchorHelp || '')}</div></div>
+              <input class="input" id="wf-anchor" type="date" aria-describedby="wf-anchor-help" data-field="start_date" value="${esc(draft.start_date)}">
+            </div>
+            <div class="row-field">
+              <div><label for="wf-auto">${esc(strings.auto)}</label><div class="hint" id="wf-auto-help">${esc(strings.autoHelp)}</div></div>
+              <ha-entity-picker id="wf-auto" data-field="auto_entity" aria-describedby="wf-auto-help"></ha-entity-picker>
+            </div>
+          </section>
+          <div class="week-overview-wrap">
+            <div class="week-overview-title">${esc(strings.weekOverview)}</div>
+            <div data-role="weekly-overview">${this._weeklyOverviewMarkup(strings)}</div>
+          </div>
+          <section class="dlg-section" id="wf-windows" tabindex="-1" aria-labelledby="wf-windows-title">
+            <div class="dlg-section-head">
+              <div><h3 id="wf-windows-title">${esc(strings.windowsAria)}</h3><p>${esc(strings.windowSectionHelp || '')}</p></div>
+              <span class="window-count" data-role="window-count">${esc(strings.windowCountLimit(draft.slots.length, MAX_SLOTS))}</span>
+            </div>
+            <div class="slots">${draft.slots.map((slot, index) => this._slotMarkup(slot, index, strings)).join('')}</div>
+            <div class="empty-windows" data-role="empty-windows" ${draft.slots.length ? 'hidden' : ''}>
+              <strong>${esc(strings.emptyWindowsTitle)}</strong>${esc(strings.emptyWindowsHelp)}
+            </div>
+            <button class="add" type="button" data-act="add-slot" ${draft.slots.length >= MAX_SLOTS ? 'disabled' : ''}>${esc(strings.addWindow)}</button>
+          </section>
+          <p class="dlg-error" id="wf-dialog-error" role="alert" aria-live="assertive">${esc(this._dialogError || '')}</p>
+        </div>
+        <footer class="dlg-foot">
+          <div class="dlg-feedback" data-role="dialog-feedback" role="status" aria-live="polite"></div>
+          <div class="dlg-actions" data-role="dialog-actions">
+            ${program ? `<button class="btn danger" type="button" data-act="delete">${esc(strings.deleteProgram)}</button>` : '<span></span>'}
+            <div class="dlg-actions-right">
+              <button class="btn" type="button" data-act="close">${esc(strings.cancel)}</button>
+              <button class="btn primary" type="button" data-act="save">${esc(strings.saveProgram)}</button>
+            </div>
+          </div>
+          <div class="dlg-confirm" data-confirm="discard" hidden>
+            <p>${esc(strings.discardPrompt)}</p>
+            <div class="dlg-confirm-actions"><button class="btn" type="button" data-act="keep-editing">${esc(strings.keepEditing)}</button><button class="btn danger" type="button" data-act="discard-changes">${esc(strings.discardChanges)}</button></div>
+          </div>
+          <div class="dlg-confirm" data-confirm="delete" hidden>
+            <p>${esc(strings.deletePrompt)}</p>
+            <div class="dlg-confirm-actions"><button class="btn" type="button" data-act="cancel-delete">${esc(strings.keepProgram)}</button><button class="btn danger" type="button" data-act="confirm-delete">${esc(strings.deleteNow)}</button></div>
+          </div>
+        </footer>
       </div>`;
-    dialog.__listBound = false;
     this._errorBox = dialog.querySelector('.dlg-error');
-    this._bindAutoList();
+    this._bindAutoPicker();
+    this._renderDialogState();
   }
 
-  _bindAutoList() {
+  _weeklyOverviewMarkup(strings = this._strings()) {
+    const draft = this._draft || emptyScheduleDraft();
+    const today = new Date().getDay() || 7;
+    return `<div class="week-overview" role="group" aria-label="${esc(strings.weekOverview)}">${strings.dayPills.map((label, index) => {
+      const day = index + 1;
+      const windows = draft.slots.filter((slot) => slot.days.includes(day)).sort((a, b) => (timeMinutes(a.start) ?? 0) - (timeMinutes(b.start) ?? 0));
+      const times = windows.map((slot) => `${slot.start} · ${formatDuration(slot.duration, strings)}`);
+      const details = strings.weekdayDetails(strings.dayNames[index], times);
+      return `<button class="week-day" type="button" data-act="focus-day" data-day="${day}" data-scheduled="${windows.length > 0}" data-today="${day === today}" aria-label="${esc(details)}" title="${esc(details)}" ${windows.length ? '' : 'disabled'}><strong>${esc(label)}</strong><small>${esc(windows.length ? windows.map((slot) => slot.start).join(', ') : '—')}</small></button>`;
+    }).join('')}</div>`;
+  }
+
+  _bindAutoPicker() {
     const dialog = this._dialog;
-    if (!dialog || dialog.__listBound) return;
-    const states = this._hass?.states || {};
-    const options = Object.keys(states).filter((id) => id.startsWith('input_boolean.'));
-    if (!options.length) return;
-    const list = document.createElement('datalist');
-    list.id = 'wf-auto-list';
-    list.innerHTML = options.map((id) => `<option value="${esc(id)}"></option>`).join('');
-    dialog.__listBound = true;
-    dialog.appendChild(list);
+    const picker = dialog?.querySelector('[data-field="auto_entity"]');
+    if (!picker) return;
+    picker.hass = this._hass;
+    picker.includeDomains = ['input_boolean'];
+    picker.value = this._draft?.auto_entity || null;
   }
 
   _slotMarkup(slot, index, strings) {
     return `
-      <div class="slot" data-slot="${index}">
+      <div class="slot" data-slot="${index}" role="group" aria-labelledby="wf-slot-title-${index}">
         <div class="slot-head">
-          <strong>${esc(strings.window(index + 1))}</strong>
+          <div><strong id="wf-slot-title-${index}">${esc(strings.window(index + 1))}</strong><div class="hint slot-meta">${esc(`${slot.start} · ${formatDuration(slot.duration, strings)}`)}</div></div>
           <button class="slot-remove" type="button" data-act="remove-slot" data-slot="${index}" aria-label="${esc(strings.removeWindow(index + 1))}">${esc(strings.removeWindow(index + 1))}</button>
         </div>
-        <div class="days" role="group" aria-label="${esc(strings.dayNames.join(', '))}">
+        <div class="days" role="group" aria-label="${esc(strings.selectWindowDays(index + 1))}">
           ${strings.dayPills.map((label, dayIndex) => {
             const day = dayIndex + 1;
             const pressed = slot.days.includes(day);
@@ -1157,58 +1322,190 @@ export class WaterFlowCard extends HTMLElementBase {
           }).join('')}
         </div>
         <div class="slot-grid">
-          <label>${esc(strings.start)}<input class="input" type="time" data-slot="${index}" data-slot-field="start" value="${esc(slot.start)}"></label>
-          <label>${esc(strings.duration)}<input class="input num" type="number" min="1" max="${MAX_DURATION_MINUTES}" step="1" data-slot="${index}" data-slot-field="duration" value="${esc(slot.duration)}"></label>
-          <label>${esc(strings.liters)}<input class="input num" type="number" min="0" step="1" data-slot="${index}" data-slot-field="liters" value="${esc(slot.liters)}" title="${esc(strings.litersHelp)}" placeholder="0"></label>
+          <label>${esc(strings.start)}<input class="input" type="time" aria-label="${esc(`${strings.window(index + 1)} · ${strings.start}`)}" data-slot="${index}" data-slot-field="start" value="${esc(slot.start)}"></label>
+          <label>${esc(strings.duration)}<input class="input num" type="number" min="1" max="${MAX_DURATION_MINUTES}" step="1" aria-label="${esc(`${strings.window(index + 1)} · ${strings.duration}`)}" data-slot="${index}" data-slot-field="duration" value="${esc(slot.duration)}"></label>
+          <label>${esc(strings.liters)}<input class="input num" type="number" min="0" step="any" aria-label="${esc(`${strings.window(index + 1)} · ${strings.liters}`)}" data-slot="${index}" data-slot-field="liters" value="${esc(slot.liters)}" title="${esc(strings.litersHelp)}" placeholder="—"></label>
         </div>
       </div>`;
   }
 
   _dialogInput(target) {
     const draft = this._draft;
-    if (!draft || !target) return;
+    if (!draft || !target || this._busy) return;
     const field = target.dataset?.field;
-    if (field === 'enabled') { draft.enabled = Boolean(target.checked); return; }
-    if (field === 'frequency_days') { draft.frequency_days = target.value === '' ? '' : Number(target.value); return; }
-    if (field === 'start_date') { draft.start_date = target.value; return; }
-    if (field === 'auto_entity') { draft.auto_entity = target.value.trim(); return; }
-    const slotIndex = Number(target.dataset?.slot);
-    const slotField = target.dataset?.slotField;
-    if (Number.isInteger(slotIndex) && draft.slots[slotIndex] && slotField) {
+    if (field === 'enabled') draft.enabled = Boolean(target.checked);
+    else if (field === 'frequency_days') {
+      draft.frequency_days = target.value === '' ? '' : Number(target.value);
+      if (Number(draft.frequency_days) === 1) draft.start_date = '';
+    }
+    else if (field === 'start_date') draft.start_date = target.value;
+    else if (field === 'auto_entity') draft.auto_entity = String(target.value ?? '').trim();
+    else {
+      const slotIndex = Number(target.dataset?.slot);
+      const slotField = target.dataset?.slotField;
+      if (!Number.isInteger(slotIndex) || !draft.slots[slotIndex] || !slotField) return;
       draft.slots[slotIndex][slotField] = slotField === 'duration' && target.value !== '' ? Number(target.value) : target.value;
     }
+    this._clearDialogValidation();
+    this._refreshWeeklyOverview();
+    this._renderDialogState();
   }
 
   _dialogAction(action, target) {
     const strings = this._strings();
     const draft = this._draft;
-    if (action === 'close') { this._closeDialog(); return; }
+    if (this._busy) return;
+    if (action === 'close') { this._requestDialogClose(); return; }
+    if (action === 'keep-editing' || action === 'cancel-delete') {
+      this._confirmDelete = false;
+      this._confirmDiscard = false;
+      this._renderDialogState();
+      return;
+    }
+    if (action === 'discard-changes') { this._closeDialog(true); return; }
+    if (action === 'confirm-delete') { this._deleteDraft(); return; }
     if (action === 'add-slot') {
-      draft.slots.push(slotDraft(draft.slots.length));
-      this._refreshSlots();
+      if (draft.slots.length >= MAX_SLOTS) return;
+      const slot = slotDraft();
+      slot.id = nextSlotId(draft.slots);
+      const index = draft.slots.push(slot) - 1;
+      this._clearDialogValidation();
+      this._refreshSlots(index);
       return;
     }
     if (action === 'remove-slot') {
-      draft.slots.splice(Number(target.dataset.slot), 1);
-      this._refreshSlots();
+      const index = Number(target.dataset.slot);
+      if (!Number.isInteger(index) || !draft.slots[index]) return;
+      draft.slots.splice(index, 1);
+      this._clearDialogValidation();
+      this._refreshSlots(Math.min(index, draft.slots.length - 1));
       return;
     }
     if (action === 'toggle-day') {
       const index = Number(target.dataset.slot);
       const day = Number(target.dataset.day);
+      if (!draft.slots[index] || !Number.isInteger(day) || day < 1 || day > 7) return;
       const days = draft.slots[index].days;
       draft.slots[index].days = days.includes(day) ? days.filter((value) => value !== day) : [...days, day].sort((a, b) => a - b);
-      this._refreshSlots();
+      target.setAttribute('aria-pressed', String(draft.slots[index].days.includes(day)));
+      this._clearDialogValidation();
+      this._refreshWeeklyOverview();
+      this._renderDialogState();
+      return;
+    }
+    if (action === 'focus-day') { this._focusScheduleDay(Number(target.dataset.day)); return; }
+    if (action === 'delete') {
+      this._confirmDelete = true;
+      this._confirmDiscard = false;
+      this._renderDialogState();
+      this._dialog.querySelector('[data-act="cancel-delete"]')?.focus?.();
       return;
     }
     if (action === 'save') { this._saveDraft(); return; }
-    if (action === 'delete') { this._deleteDraft(); return; }
   }
 
-  _refreshSlots() {
+  _refreshSlots(focusIndex = null) {
     const container = this._dialog?.querySelector('.slots');
     if (!container) return;
     container.innerHTML = this._draft.slots.map((slot, index) => this._slotMarkup(slot, index, this._strings())).join('');
+    this._refreshWeeklyOverview();
+    this._renderDialogState();
+    if (focusIndex !== null && focusIndex >= 0) {
+      this._dialog.querySelector(`.slot[data-slot="${focusIndex}"] .day`)?.focus?.();
+      this._dialog.querySelector(`.slot[data-slot="${focusIndex}"]`)?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    } else if (!this._draft.slots.length) {
+      this._dialog.querySelector('[data-act="add-slot"]')?.focus?.();
+    }
+  }
+
+  _refreshWeeklyOverview() {
+    const overview = this._dialog?.querySelector('[data-role="weekly-overview"]');
+    if (overview) overview.innerHTML = this._weeklyOverviewMarkup();
+  }
+
+  _focusScheduleSection(focus = 'slots') {
+    const target = focus === 'frequency'
+      ? this._dialog?.querySelector('[data-field="frequency_days"]')
+      : this._dialog?.querySelector('#wf-windows');
+    if (!target) return;
+    target.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    target.focus?.({ preventScroll: true });
+    if (focus === 'frequency') target.select?.();
+  }
+
+  _focusScheduleDay(day) {
+    const index = this._draft?.slots?.findIndex((slot) => slot.days.includes(day)) ?? -1;
+    if (index < 0) return;
+    const target = this._dialog?.querySelector(`.slot[data-slot="${index}"] .day[data-day="${day}"]`);
+    target?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    target?.focus?.();
+  }
+
+  _isScheduleDraftDirty() {
+    return Boolean(this._draft && this._scheduleSnapshot && JSON.stringify(this._draft) !== this._scheduleSnapshot);
+  }
+
+  _renderDialogState() {
+    const dialog = this._dialog;
+    const draft = this._draft;
+    if (!dialog || !draft) return;
+    const strings = this._strings();
+    const dirty = this._isScheduleDraftDirty();
+    const frequency = dialog.querySelector('[data-role="summary-frequency"]');
+    const count = dialog.querySelector('[data-role="summary-count"]');
+    const status = dialog.querySelector('[data-role="program-status"]');
+    const windowCount = dialog.querySelector('[data-role="window-count"]');
+    const anchorRow = dialog.querySelector('[data-role="anchor-row"]');
+    const empty = dialog.querySelector('[data-role="empty-windows"]');
+    const add = dialog.querySelector('[data-act="add-slot"]');
+    const feedback = dialog.querySelector('[data-role="dialog-feedback"]');
+    if (frequency) frequency.textContent = frequencyLabel(draft.frequency_days, strings);
+    if (count) count.textContent = strings.windowCount(draft.slots.length);
+    if (status) {
+      status.textContent = draft.enabled ? strings.activeProgram : strings.pausedProgram;
+      status.dataset.enabled = String(draft.enabled);
+    }
+    if (windowCount) windowCount.textContent = strings.windowCountLimit(draft.slots.length, MAX_SLOTS);
+    if (anchorRow) anchorRow.hidden = !(Number(draft.frequency_days) > 1);
+    if (empty) empty.hidden = draft.slots.length > 0;
+    if (add) add.disabled = this._busy || draft.slots.length >= MAX_SLOTS;
+    if (feedback) {
+      feedback.dataset.dirty = String(dirty);
+      feedback.textContent = this._busy
+        ? (this._busyAction === 'delete' ? strings.deletingProgram : strings.savingProgram)
+        : dirty ? strings.unsavedChanges : '';
+    }
+    const showDiscard = this._confirmDiscard && !this._busy;
+    const showDelete = this._confirmDelete && !this._busy;
+    const discardPanel = dialog.querySelector('[data-confirm="discard"]');
+    const deletePanel = dialog.querySelector('[data-confirm="delete"]');
+    const actions = dialog.querySelector('[data-role="dialog-actions"]');
+    if (discardPanel) discardPanel.hidden = !showDiscard;
+    if (deletePanel) deletePanel.hidden = !showDelete;
+    if (actions) actions.hidden = showDiscard || showDelete;
+    const save = dialog.querySelector('[data-act="save"]');
+    if (save) save.textContent = this._busyAction === 'save' ? strings.savingProgram : strings.saveProgram;
+    const deleteButton = dialog.querySelector('[data-act="delete"]');
+    if (deleteButton) deleteButton.textContent = this._busyAction === 'delete' ? strings.deletingProgram : strings.deleteProgram;
+    if (this._busy) dialog.setAttribute('aria-busy', 'true');
+    else dialog.removeAttribute('aria-busy');
+  }
+
+  _setDialogBusy(busy, action = null) {
+    const dialog = this._dialog;
+    this._busy = busy;
+    this._busyAction = busy ? action : null;
+    if (!dialog) return;
+    for (const control of dialog.querySelectorAll('button,input,ha-entity-picker')) {
+      if (busy) {
+        control.dataset.busyWasDisabled = String(Boolean(control.disabled));
+        control.disabled = true;
+      } else if (control.dataset.busyWasDisabled !== undefined) {
+        control.disabled = control.dataset.busyWasDisabled === 'true';
+        delete control.dataset.busyWasDisabled;
+      }
+    }
+    this._renderDialogState();
   }
 
   _setDialogError(message) {
@@ -1216,38 +1513,149 @@ export class WaterFlowCard extends HTMLElementBase {
     if (this._errorBox) this._errorBox.textContent = message || '';
   }
 
-  _saveDraft() {
+  _clearDialogValidation() {
+    for (const target of this._dialog?.querySelectorAll('[aria-invalid="true"]') || []) {
+      target.removeAttribute('aria-invalid');
+      const describedBy = (target.getAttribute('aria-describedby') || '').split(/\s+/).filter((id) => id && id !== 'wf-dialog-error');
+      if (describedBy.length) target.setAttribute('aria-describedby', describedBy.join(' '));
+      else target.removeAttribute('aria-describedby');
+    }
+    this._setDialogError('');
+  }
+
+  _validationMessage(result) {
+    const context = { ...result.context };
+    if (result.code === 'slots_overlap') {
+      for (const key of ['a', 'b']) {
+        const index = this._draft.slots.findIndex((slot) => slot.id === context[key]);
+        if (index >= 0) context[key] = this._strings().window(index + 1);
+      }
+    }
+    return errorLabel({ ...result, context }, this._strings()) || this._strings().invalidDraft;
+  }
+
+  _showValidationError(result) {
+    let target = null;
+    const field = {
+      invalid_enabled: 'enabled',
+      invalid_frequency: 'frequency_days',
+      invalid_start_date: 'start_date',
+      frequency_needs_anchor: 'start_date',
+      invalid_auto_entity: 'auto_entity',
+    }[result.code];
+    if (field) target = this._dialog?.querySelector(`[data-field="${field}"]`);
+    if (!target && ['invalid_time', 'invalid_duration', 'invalid_liters', 'invalid_days', 'duplicate_days', 'invalid_slot_schema', 'invalid_slot_id', 'duplicate_slot_id', 'slots_overlap'].includes(result.code)) {
+      let index = 0;
+      let slotField = null;
+      if (result.code === 'slots_overlap') {
+        index = this._draft.slots.findIndex((slot) => slot.id === result.context.b);
+        slotField = 'start';
+      } else if (result.code === 'invalid_time') {
+        index = this._draft.slots.findIndex((slot) => timeMinutes(slot.start) === null);
+        slotField = 'start';
+      } else if (result.code === 'invalid_duration') {
+        index = this._draft.slots.findIndex((slot) => {
+          const value = numeric(slot.duration);
+          return value === null || !Number.isInteger(value) || value < 1 || value > MAX_DURATION_MINUTES;
+        });
+        slotField = 'duration';
+      } else if (result.code === 'invalid_liters') {
+        index = this._draft.slots.findIndex((slot) => slot.liters !== '' && slot.liters !== null && slot.liters !== undefined && (numeric(slot.liters) === null || numeric(slot.liters) <= 0));
+        slotField = 'liters';
+      } else if (result.code === 'invalid_days') {
+        index = this._draft.slots.findIndex((slot) => !Array.isArray(slot.days) || !slot.days.length || slot.days.some((day) => !Number.isInteger(day) || day < 1 || day > 7));
+      } else if (result.code === 'duplicate_days') {
+        index = this._draft.slots.findIndex((slot) => Array.isArray(slot.days) && new Set(slot.days).size !== slot.days.length);
+      } else if (result.code === 'duplicate_slot_id') {
+        index = this._draft.slots.findIndex((slot, slotIndex) => this._draft.slots.findIndex((candidate) => candidate.id === slot.id) !== slotIndex);
+      } else if (result.code === 'invalid_slot_id') {
+        index = this._draft.slots.findIndex((slot) => typeof slot.id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(slot.id));
+      }
+      index = Math.max(index, 0);
+      target = result.code === 'invalid_slot_id'
+        ? this._dialog?.querySelector(`.slot[data-slot="${index}"] [data-act="remove-slot"]`)
+        : slotField
+          ? this._dialog?.querySelector(`[data-slot="${index}"][data-slot-field="${slotField}"]`)
+          : this._dialog?.querySelector(`.slot[data-slot="${index}"] .day`);
+    }
+    if (result.code === 'too_many_slots') target = this._dialog?.querySelector('.slot [data-act="remove-slot"]');
+    if (['empty_enabled_program', 'invalid_slots'].includes(result.code)) target = this._dialog?.querySelector('[data-act="add-slot"]');
+    const message = this._validationMessage(result);
+    this._setDialogError(message);
+    if (target) {
+      target.setAttribute('aria-invalid', 'true');
+      const describedBy = new Set((target.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean));
+      describedBy.add('wf-dialog-error');
+      target.setAttribute('aria-describedby', [...describedBy].join(' '));
+      target.closest?.('.slot')?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+      target.focus?.();
+    }
+  }
+
+  async _saveDraft() {
+    if (this._busy) return;
     const strings = this._strings();
     const result = validateScheduleDraft(this._draft);
     if (!result.ok) {
-      this._setDialogError(errorLabel(result, strings) || strings.invalidDraft);
+      this._showValidationError(result);
       return;
     }
     const payload = programPayload(this.config.entity, this._draft);
     fireHaptic(this.config.haptics !== false, this.config.haptics_style);
-    this._setDialogError('');
-    this._service(WATER_FLOW_DOMAIN, 'save_program', payload).then(() => {
-      if (this._dialogError) return;
-      this._closeDialog();
-    });
+    this._clearDialogValidation();
+    this._setDialogBusy(true, 'save');
+    await this._service(WATER_FLOW_DOMAIN, 'save_program', payload);
+    const failed = Boolean(this._dialogError);
+    this._setDialogBusy(false);
+    if (!failed) this._closeDialog(true);
   }
 
-  _deleteDraft() {
-    const strings = this._strings();
-    if (typeof globalThis.confirm === 'function' && !globalThis.confirm(strings.deleteConfirm)) return;
-    this._setDialogError('');
-    this._service(WATER_FLOW_DOMAIN, 'delete_program', deleteProgramPayload(this.config.entity)).then(() => {
-      if (this._dialogError) return;
-      this._closeDialog();
-    });
+  async _deleteDraft() {
+    if (this._busy) return;
+    this._clearDialogValidation();
+    this._setDialogBusy(true, 'delete');
+    await this._service(WATER_FLOW_DOMAIN, 'delete_program', deleteProgramPayload(this.config.entity));
+    const failed = Boolean(this._dialogError);
+    this._setDialogBusy(false);
+    if (!failed) this._closeDialog(true);
   }
 
-  _closeDialog() {
+  _requestDialogClose() {
+    if (this._busy) return;
+    this._confirmDelete = false;
+    if (this._isScheduleDraftDirty()) {
+      this._confirmDiscard = true;
+      this._renderDialogState();
+      this._dialog?.querySelector('[data-act="keep-editing"]')?.focus?.();
+      return;
+    }
+    this._closeDialog(true);
+  }
+
+  _closeDialog(force = false) {
     const dialog = this._dialog;
     if (!dialog) return;
+    if (this._busy) return;
+    if (!force && this._isScheduleDraftDirty()) { this._requestDialogClose(); return; }
     if (typeof dialog.close === 'function' && dialog.open) dialog.close();
-    else dialog.removeAttribute('open');
-    this._setDialogError('');
+    else {
+      dialog.removeAttribute('open');
+      this._onDialogClose();
+    }
+  }
+
+  _onDialogClose() {
+    this._lastRenderKey = null;
+    this._draft = null;
+    this._scheduleSnapshot = null;
+    this._dialogError = null;
+    this._errorBox = null;
+    this._busy = false;
+    this._busyAction = null;
+    this._confirmDelete = false;
+    this._confirmDiscard = false;
+    this._scheduleOpener?.focus?.();
+    this._scheduleOpener = null;
   }
 }
 
