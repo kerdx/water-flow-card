@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.1.1
+
+- Fix card editor configuration updates by sending `config-changed` events with Home Assistant's expected `detail.config` payload.
+
 ## v1.1.0
 
 - Add the integration brand icon and repository metadata for HACS validation.

@@ -498,6 +498,22 @@ test('editor row markup binds every selector to a localized label', () => {
   }
 });
 
+test('editor sends config-changed using the Home Assistant event contract', () => {
+  const editor = new WaterFlowCardEditor();
+  editor._config = defaultCardConfig('switch.irrigazione');
+  let received;
+  editor.dispatchEvent = (event) => { received = event; };
+
+  editor._updateField('layout', 'compact');
+
+  assert.equal(received.type, 'config-changed');
+  assert.equal(received.bubbles, true);
+  assert.equal(received.composed, true);
+  assert.deepEqual(received.detail, {
+    config: { entity: 'switch.irrigazione', layout: 'compact' },
+  });
+});
+
 test('editor builds its sections once and forwards hass ticks without rebuilding', () => {
   const source = cardSource();
   const start = source.indexOf('export class WaterFlowCardEditor');

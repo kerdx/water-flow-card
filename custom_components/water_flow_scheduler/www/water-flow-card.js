@@ -1374,7 +1374,11 @@ export class WaterFlowCardEditor extends HTMLElementBase {
     const stripped = stripCardDefaults(next);
     if (sameCardConfig(this._config, stripped)) return;
     this._config = stripped;
-    this.dispatchEvent(new CustomEvent('config-changed', { detail: stripped, bubbles: true, composed: true }));
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      detail: { config: stripped },
+      bubbles: true,
+      composed: true,
+    }));
   }
 
   _renderValues() {
